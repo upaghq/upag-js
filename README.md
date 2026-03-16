@@ -17,156 +17,123 @@ import { UpagJs } from 'upag-js';
 
 // Using public key only
 const upag = new UpagJs('pk_test_your_public_key');
-
-// Or with full configuration
-const upag = new UpagJs({
-  publicKey: 'pk_test_your_public_key',
-  baseURL: 'https://api.upag.io/v1', // optional
-  timeout: 30000 // optional, default 30s
-});
 ```
 
-⚠️ **Important**: Always use your **public key** (`pk_test_xxx` or `pk_live_xxx`) in frontend code, never your secret key!
+> **Important**: Always use your **public key** (`pk_test_xxx` or `pk_live_xxx`) in frontend code, never your secret key!
 
-### Checkout
+### Checkout Sessions
+
+Create a checkout session with price items and redirect the customer to the hosted checkout page.
 
 ```javascript
-// Create a checkout session
 const session = await upag.checkout.createSession({
-  customerEmail: 'customer@example.com',
-  amount: 10000, // R$ 100.00 in cents
-  currency: 'BRL',
+  items: [
+    { priceId: 'prc_123', quantity: 1 },
+    { priceId: 'prc_456', quantity: 2 },
+  ],
   successUrl: 'https://yoursite.com/success',
   cancelUrl: 'https://yoursite.com/cancel',
-  description: 'Premium Plan Subscription',
-  paymentMethods: ['credit_card', 'pix']
+  paymentMethods: ['credit_card', 'pix'],
+  billingAddressCollection: 'required',
+  customerId: 'cus_123', // optional
 });
 
 // Redirect to checkout
 window.location.href = session.url;
 
-// Or use the helper method
-upag.checkout.redirectToCheckout(session.id);
-
-// Retrieve a checkout session
-const session = await upag.checkout.retrieveSession('cs_123');
-```
-
-### Payment Methods (Secure Card Handling)
-
-**Recommended approach using tokenization:**
-
-```javascript
-// Step 1: Tokenize the card (secure)
-const token = await upag.paymentMethods.tokenizeCard({
-  number: '4242424242424242',
-  expMonth: 12,
-  expYear: 2025,
-  cvc: '123',
-  holderName: 'John Doe'
+// Or use the helper to create and redirect in one step
+await upag.checkout.redirectToCheckout({
+  items: [{ priceId: 'prc_123', quantity: 1 }],
+  successUrl: 'https://yoursite.com/success',
+  cancelUrl: 'https://yoursite.com/cancel',
 });
-
-// Step 2: Create payment method with token
-const paymentMethod = await upag.paymentMethods.createFromToken(
-  'cus_123', // customerId
-  token.id
-);
-
-console.log('Payment method created:', paymentMethod);
-console.log('Card brand:', paymentMethod.card.brand);
-console.log('Last 4 digits:', paymentMethod.card.last4);
 ```
 
-**Alternative approach (less secure):**
+### Customers
 
 ```javascript
-// Create payment method directly
-const paymentMethod = await upag.paymentMethods.create({
-  customerId: 'cus_123',
+const customer = await upag.customers.create({
+  email: 'customer@example.com',
+  name: 'John Doe',
+  phone: '+5511999999999',
+  taxId: '12345678900',
+  line1: 'Rua Example, 123',
+  city: 'São Paulo',
+  state: 'SP',
+  country: 'BR',
+  zipCode: '01001000',
+});
+```
+
+### Products & Prices
+
+```javascript
+// List all products
+const { data: products } = await upag.products.list();
+
+// Retrieve a specific product
+const product = await upag.products.retrieve('prd_123');
+
+// List prices for a product
+const { data: prices } = await upag.products.listPrices('prd_123');
+
+// Retrieve a specific price
+const price = await upag.products.retrievePrice('prd_123', 'prc_456');
+```
+
+### Payment Methods
+
+```javascript
+// Create a payment method for a customer
+const paymentMethod = await upag.paymentMethods.create('cus_123', {
   type: 'credit_card',
   card: {
     number: '4242424242424242',
     expMonth: 12,
-    expYear: 2025,
+    expYear: 2027,
     cvc: '123',
-    holderName: 'John Doe'
-  }
+    holderName: 'John Doe',
+  },
 });
 ```
 
-**List and manage payment methods:**
+### Antifraud
+
+The antifraud module automatically collects device and browser fingerprinting data (canvas, WebGL, audio hashes, bot detection, etc.) and creates a session.
 
 ```javascript
-// List payment methods for a customer
-const methods = await upag.paymentMethods.listByCustomer('cus_123');
+// Auto-collect all browser data and create session
+const session = await upag.antifraud.createSession();
 
-// Retrieve a specific payment method
-const method = await upag.paymentMethods.retrieve('pm_123');
-
-// Delete a payment method
-const deleted = await upag.paymentMethods.delete('pm_123');
-```
-
-### Payments
-
-```javascript
-// Create a payment
-const payment = await upag.payments.create({
-  customerId: 'cus_123',
-  amount: 10000, // R$ 100.00 in cents
-  currency: 'BRL',
-  paymentMethod: 'credit_card',
-  paymentMethodId: 'pm_123',
-  description: 'Order #123'
-});
-
-// Or use a card token
-const payment = await upag.payments.create({
-  customerId: 'cus_123',
-  amount: 10000,
-  currency: 'BRL',
-  paymentMethod: 'credit_card',
-  cardToken: 'tok_123',
-  description: 'Order #123'
-});
-
-// Retrieve a payment
-const payment = await upag.payments.retrieve('pay_123');
-
-// Confirm a payment (for 3D Secure, etc)
-const confirmed = await upag.payments.confirm('pay_123', {
-  paymentMethodId: 'pm_123'
-});
+console.log(session.id);        // antifraud session ID
+console.log(session.expiresAt); // session expiry
 ```
 
 ## Framework Examples
 
-### React Example
+### React
 
 ```jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UpagJs } from 'upag-js';
 
 const upag = new UpagJs('pk_test_your_public_key');
 
-function CheckoutButton() {
+function CheckoutButton({ priceId }) {
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = async () => {
     setLoading(true);
     try {
       const session = await upag.checkout.createSession({
-        customerEmail: 'customer@example.com',
-        amount: 10000,
-        currency: 'BRL',
+        items: [{ priceId, quantity: 1 }],
         successUrl: `${window.location.origin}/success`,
         cancelUrl: `${window.location.origin}/cancel`,
       });
-      
+
       window.location.href = session.url;
     } catch (error) {
       console.error('Checkout error:', error);
-      alert(error.message);
     } finally {
       setLoading(false);
     }
@@ -180,7 +147,7 @@ function CheckoutButton() {
 }
 ```
 
-### Vue Example
+### Vue
 
 ```vue
 <template>
@@ -193,6 +160,8 @@ function CheckoutButton() {
 import { ref } from 'vue';
 import { UpagJs } from 'upag-js';
 
+const props = defineProps({ priceId: String });
+
 const upag = new UpagJs('pk_test_your_public_key');
 const loading = ref(false);
 
@@ -200,17 +169,14 @@ async function handleCheckout() {
   loading.value = true;
   try {
     const session = await upag.checkout.createSession({
-      customerEmail: 'customer@example.com',
-      amount: 10000,
-      currency: 'BRL',
+      items: [{ priceId: props.priceId, quantity: 1 }],
       successUrl: `${window.location.origin}/success`,
       cancelUrl: `${window.location.origin}/cancel`,
     });
-    
+
     window.location.href = session.url;
   } catch (error) {
     console.error('Checkout error:', error);
-    alert(error.message);
   } finally {
     loading.value = false;
   }
@@ -221,52 +187,44 @@ async function handleCheckout() {
 ### Vanilla JavaScript
 
 ```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Upag Checkout</title>
-</head>
-<body>
-  <button id="checkout-btn">Checkout</button>
+<button id="checkout-btn">Checkout</button>
 
-  <script type="module">
-    import { UpagJs } from 'https://cdn.jsdelivr.net/npm/upag-js@1.0.0/dist/index.esm.js';
+<script type="module">
+  import { UpagJs } from 'https://cdn.jsdelivr.net/npm/upag-js/dist/index.esm.js';
 
-    const upag = new UpagJs('pk_test_your_public_key');
-    
-    document.getElementById('checkout-btn').addEventListener('click', async () => {
-      try {
-        const session = await upag.checkout.createSession({
-          customerEmail: 'customer@example.com',
-          amount: 10000,
-          currency: 'BRL',
-          successUrl: window.location.origin + '/success',
-          cancelUrl: window.location.origin + '/cancel',
-        });
-        
-        window.location.href = session.url;
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    });
-  </script>
-</body>
-</html>
+  const upag = new UpagJs('pk_test_your_public_key');
+
+  document.getElementById('checkout-btn').addEventListener('click', async () => {
+    try {
+      const session = await upag.checkout.createSession({
+        items: [{ priceId: 'prc_123', quantity: 1 }],
+        successUrl: window.location.origin + '/success',
+        cancelUrl: window.location.origin + '/cancel',
+      });
+
+      window.location.href = session.url;
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  });
+</script>
 ```
 
-## TypeScript Support
+## TypeScript
 
 This library is written in TypeScript and includes type definitions out of the box.
 
 ```typescript
-import { 
+import {
   UpagJs,
   CheckoutSession,
-  PaymentMethod,
-  Payment,
-  CardToken,
   CreateCheckoutSessionParams,
-  TokenizeCardParams
+  Customer,
+  CreateCustomerParams,
+  Product,
+  Price,
+  PaymentMethod,
+  AntifraudSession,
 } from 'upag-js';
 ```
 
@@ -276,16 +234,16 @@ All API errors are thrown with detailed information:
 
 ```javascript
 try {
-  const payment = await upag.payments.create({
-    customerId: 'cus_123',
-    amount: 10000,
-    paymentMethod: 'credit_card'
+  const session = await upag.checkout.createSession({
+    items: [{ priceId: 'prc_123', quantity: 1 }],
+    successUrl: 'https://yoursite.com/success',
+    cancelUrl: 'https://yoursite.com/cancel',
   });
 } catch (error) {
-  console.error('Error type:', error.type);
-  console.error('Error message:', error.message);
-  console.error('Status code:', error.statusCode);
-  console.error('Error code:', error.code);
+  console.error('Type:', error.type);
+  console.error('Message:', error.message);
+  console.error('Status:', error.statusCode);
+  console.error('Code:', error.code);
   console.error('Details:', error.details);
 }
 ```
@@ -298,15 +256,30 @@ try {
 - `network_error` - Network/connection error
 - `client_error` - Client-side error
 
+## API Reference
+
+| Resource | Method | Description |
+|----------|--------|-------------|
+| `checkout` | `createSession(params)` | Create a checkout session |
+| `checkout` | `redirectToCheckout(params)` | Create session and redirect to checkout URL |
+| `customers` | `create(params)` | Create a customer |
+| `products` | `list()` | List all products |
+| `products` | `retrieve(productId)` | Retrieve a product |
+| `products` | `listPrices(productId)` | List prices for a product |
+| `products` | `retrievePrice(productId, priceId)` | Retrieve a specific price |
+| `paymentMethods` | `create(customerId, params)` | Create a payment method |
+| `antifraud` | `createSession()` | Create antifraud session (auto-collects browser data) |
+
 ## Security Best Practices
 
-### ✅ DO:
+**DO:**
 - Use public keys (`pk_test_xxx` or `pk_live_xxx`) in frontend
 - Use card tokenization for secure card handling
+- Use antifraud sessions to detect suspicious activity
 - Validate input on your backend
 - Use HTTPS in production
 
-### ❌ DON'T:
+**DON'T:**
 - Never use secret keys (`sk_test_xxx` or `sk_live_xxx`) in frontend
 - Never store card data in your frontend
 - Never trust frontend-only validation
@@ -326,24 +299,12 @@ Get your public keys from the [Upag Dashboard](https://dashboard.upag.io).
 - Edge (latest)
 - Mobile browsers (iOS Safari, Chrome Mobile)
 
-## Bundle Size
-
-- Minified: ~15KB
-- Gzipped: ~5KB
-
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Build the package
 npm run build
-
-# Watch mode for development
 npm run dev
-
-# Run tests
 npm test
 ```
 
@@ -356,8 +317,3 @@ MIT
 - Documentation: https://docs.upag.io
 - Email: support@upag.io
 - GitHub: https://github.com/upag/upag-js
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-

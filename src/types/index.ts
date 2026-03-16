@@ -63,7 +63,6 @@ export interface PaymentMethod {
 }
 
 export interface CreatePaymentMethodParams {
-  customerId: string;
   type: PaymentMethodType;
   card?: {
     number: string;
@@ -72,25 +71,6 @@ export interface CreatePaymentMethodParams {
     cvc: string;
     holderName: string;
   };
-}
-
-export interface TokenizeCardParams {
-  number: string;
-  expMonth: number;
-  expYear: number;
-  cvc: string;
-  holderName: string;
-}
-
-export interface CardToken {
-  id: string;
-  card: {
-    brand: string;
-    last4: string;
-    expMonth: number;
-    expYear: number;
-  };
-  createdAt: Date;
 }
 
 // Product types
@@ -232,14 +212,8 @@ export interface CreateAntifraudSessionParams {
   bot?: AntifraudBotInfo;
 }
 
-export type AntifraudRiskLevel = 'low' | 'medium' | 'high' | 'critical';
-
 export interface AntifraudSession {
   id: string;
-  livemode: boolean;
-  riskScore: number;
-  riskLevel: AntifraudRiskLevel;
-  riskFactors: string[];
   expiresAt: Date;
 }
 
