@@ -12,12 +12,35 @@ export interface ListResponse<T> {
   total?: number;
 }
 
-// Customer types (limited info for frontend)
+// Customer types
 export interface Customer {
   id: string;
+  livemode: boolean;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  taxId: string | null;
+  line1: string | null;
+  line2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  zipCode: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateCustomerParams {
   email: string;
   name: string;
-  phone?: string | null;
+  phone?: string;
+  taxId?: string;
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  zipCode?: string | null;
 }
 
 // Payment Method types
@@ -70,57 +93,154 @@ export interface CardToken {
   createdAt: Date;
 }
 
-// Payment types (public info only)
-export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled';
-
-export interface Payment {
+// Product types
+export interface Product {
   id: string;
-  amount: number;
-  currency: string;
-  status: PaymentStatus;
-  paymentMethod: PaymentMethodType;
-  description?: string | null;
+  name: string;
+  description: string;
+  image: string | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface CreatePaymentParams {
-  customerId: string;
+// Price types
+export type BillingType = 'one_time' | 'recurring';
+export type RecurringInterval = 'day' | 'week' | 'month' | 'year';
+
+export interface Price {
+  id: string;
+  name: string;
+  billingType: BillingType;
+  interval: RecurringInterval | null;
+  intervalCount: number | null;
+  currency: string;
   amount: number;
-  currency?: string;
-  paymentMethod: PaymentMethodType;
-  paymentMethodId?: string;
-  cardToken?: string;
-  description?: string;
-}
-
-export interface ConfirmPaymentParams {
-  paymentMethodId?: string;
-  cardToken?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Checkout types
+export interface CheckoutSessionProduct {
+  id: string;
+  name: string;
+  description: string;
+  image: string | null;
+}
+
+export interface CheckoutSessionPrice {
+  id: string;
+  name: string;
+  billingType: BillingType;
+  interval: RecurringInterval | null;
+  intervalCount: number | null;
+  currency: string;
+  amount: number;
+  product?: CheckoutSessionProduct;
+}
+
+export interface CheckoutSessionItem {
+  id: string;
+  priceId: string;
+  quantity: number;
+  price?: CheckoutSessionPrice;
+}
+
+export type BillingAddressCollection = 'auto' | 'required' | 'none';
+
 export interface CheckoutSession {
   id: string;
-  url: string;
   status: 'open' | 'complete' | 'expired';
-  customer?: Customer;
-  amount: number;
-  currency: string;
-  successUrl: string;
-  cancelUrl: string;
-  expiresAt: Date;
+  customerId: string | null;
+  url: string;
+  billingAddressCollection: BillingAddressCollection;
+  successUrl: string | null;
+  cancelUrl: string | null;
   createdAt: Date;
+  updatedAt: Date;
+  expiresAt: Date | null;
+  items: CheckoutSessionItem[];
 }
 
 export interface CreateCheckoutSessionParams {
-  customerId?: string;
-  customerEmail?: string;
-  amount: number;
-  currency?: string;
-  successUrl: string;
-  cancelUrl: string;
-  description?: string;
+  customerId?: string | null;
+  items: { priceId: string; quantity: number }[];
   paymentMethods?: PaymentMethodType[];
+  billingAddressCollection?: BillingAddressCollection;
+  successUrl?: string | null;
+  cancelUrl?: string | null;
+}
+
+// Antifraud types
+export interface AntifraudDeviceInfo {
+  screenWidth?: number;
+  screenHeight?: number;
+  availWidth?: number;
+  availHeight?: number;
+  colorDepth?: number;
+  pixelRatio?: number;
+  hardwareConcurrency?: number;
+  deviceMemory?: number;
+  maxTouchPoints?: number;
+}
+
+export interface AntifraudBrowserInfo {
+  platform?: string;
+  vendor?: string;
+  language?: string;
+  languages?: string[];
+  cookieEnabled?: boolean;
+  doNotTrack?: string | null;
+  pdfViewerEnabled?: boolean;
+}
+
+export interface AntifraudTimeInfo {
+  timezone?: string;
+  timezoneOffset?: number;
+}
+
+export interface AntifraudHashesInfo {
+  canvas?: string;
+  webgl?: string;
+  audio?: string;
+  fonts?: string;
+}
+
+export interface AntifraudGraphicsInfo {
+  webglRenderer?: string;
+  webglVendor?: string;
+}
+
+export interface AntifraudConnectionInfo {
+  type?: string;
+  effectiveType?: string;
+  downlink?: number;
+}
+
+export interface AntifraudBotInfo {
+  webdriver?: boolean;
+  automationFlags?: string[];
+}
+
+export interface CreateAntifraudSessionParams {
+  fingerprint?: string;
+  device?: AntifraudDeviceInfo;
+  browser?: AntifraudBrowserInfo;
+  time?: AntifraudTimeInfo;
+  hashes?: AntifraudHashesInfo;
+  graphics?: AntifraudGraphicsInfo;
+  connection?: AntifraudConnectionInfo;
+  bot?: AntifraudBotInfo;
+}
+
+export type AntifraudRiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+export interface AntifraudSession {
+  id: string;
+  livemode: boolean;
+  riskScore: number;
+  riskLevel: AntifraudRiskLevel;
+  riskFactors: string[];
+  expiresAt: Date;
 }
 
 // Error types
@@ -131,4 +251,3 @@ export interface UpagError {
   statusCode?: number;
   details?: any;
 }
-
