@@ -3,7 +3,7 @@ import { PaymentMethod, CreatePaymentMethodParams } from '../types';
 
 export class PaymentMethods extends BaseResource {
   constructor(http: any) {
-    super(http, '/customers');
+    super(http, '/billing/customers');
   }
 
   async create(customerId: string, params: CreatePaymentMethodParams): Promise<PaymentMethod> {

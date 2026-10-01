@@ -6,7 +6,7 @@ import {
 
 export class Customers extends BaseResource {
   constructor(http: any) {
-    super(http, '/customers');
+    super(http, '/billing/customers');
   }
 
   async create(params: CreateCustomerParams): Promise<Customer> {

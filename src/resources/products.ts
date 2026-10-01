@@ -7,7 +7,7 @@ import {
 
 export class Products extends BaseResource {
   constructor(http: any) {
-    super(http, '/products');
+    super(http, '/billing/products');
   }
 
   async list(): Promise<ListResponse<Product>> {
