@@ -3,6 +3,11 @@ export interface UpagJsConfig {
   publicKey: string;
   baseURL?: string;
   timeout?: number;
+  /**
+   * Environment of the core API, which serves 3D Secure. When omitted it follows the
+   * key (`pk_test_` is sandbox, `pk_live_` is production) and defaults to production.
+   */
+  environment?: 'production' | 'sandbox';
 }
 
 // Common types
@@ -71,6 +76,58 @@ export interface CreatePaymentMethodParams {
     cvc: string;
     holderName: string;
   };
+}
+
+// Card types
+export type CardBrand =
+  | 'visa'
+  | 'mastercard'
+  | 'elo'
+  | 'amex'
+  | 'hipercard'
+  | 'diners'
+  | 'discover'
+  | 'jcb'
+  | 'aura'
+  | 'unknown';
+
+export type CardFunding = 'credit' | 'debit' | 'prepaid' | 'unknown';
+export type CardWallet = 'apple_pay' | 'google_pay';
+export type CardStatus = 'active' | 'invalid' | 'removed';
+
+export interface Card {
+  id: string;
+  customerId: string | null;
+  brand: CardBrand;
+  firstDigits: string;
+  lastDigits: string;
+  holderName: string;
+  expirationMonth: number;
+  expirationYear: number;
+  funding: CardFunding | null;
+  wallet: CardWallet | null;
+  status: CardStatus;
+  /** ISO 8601 timestamps, as sent by the API. */
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCardParams {
+  /** Card number, 13 to 19 digits, no spaces or dashes. */
+  number: string;
+  /** 1 to 12. */
+  expirationMonth: number;
+  /** Four-digit year. */
+  expirationYear: number;
+  /** Security code, 3 or 4 digits. */
+  cvv: string;
+  /** Letters and spaces only, 2 to 64 characters (no accents or punctuation). */
+  holderName: string;
+}
+
+export interface CreateCardOptions {
+  /** Sent as the `Idempotency-Key` header (max 255 characters). */
+  idempotencyKey?: string;
 }
 
 // Product types
@@ -215,6 +272,52 @@ export interface CreateAntifraudSessionParams {
 export interface AntifraudSession {
   id: string;
   expiresAt: Date;
+}
+
+// 3D Secure types
+export type ThreeDSecureSessionStatus =
+  | 'requires_action'
+  | 'completed'
+  | 'failed'
+  | 'canceled'
+  | 'expired';
+
+export interface AuthenticateThreeDSecureParams {
+  /**
+   * The `clientSecret` of a 3D Secure session your server created. It identifies
+   * the session and authorizes this browser to work on it: pass it to the page and
+   * to nobody else.
+   */
+  clientSecret: string;
+}
+
+export interface ThreeDSecureOptions {
+  /** Maximum time for the whole browser authentication, in ms (default 10 minutes). */
+  timeoutMs?: number;
+  /** Progress callback, useful to show loading states. */
+  onStatusChange?: (status: ThreeDSecureProgress) => void;
+}
+
+export type ThreeDSecureProgress = 'starting' | 'authenticating' | 'completing' | 'idle';
+
+export interface ThreeDSecureNextAction {
+  type: 'browser_authentication';
+  token: string;
+  environment: 'sandbox' | 'production';
+  /** Opaque payload built by the server. Passed through as-is. */
+  payload: Record<string, unknown>;
+}
+
+export interface ThreeDSecureSession {
+  id: string;
+  status: ThreeDSecureSessionStatus;
+  nextAction?: ThreeDSecureNextAction | null;
+}
+
+export interface ThreeDSecureResult {
+  /** Send this id to your backend as `threeDSecureSessionId` when creating the charge. */
+  sessionId: string;
+  status: 'completed';
 }
 
 // Error types

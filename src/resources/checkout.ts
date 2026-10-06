@@ -6,7 +6,7 @@ import {
 
 export class Checkout extends BaseResource {
   constructor(http: any) {
-    super(http, '/checkout-sessions');
+    super(http, '/billing/checkout-sessions');
   }
 
   async createSession(params: CreateCheckoutSessionParams): Promise<CheckoutSession> {

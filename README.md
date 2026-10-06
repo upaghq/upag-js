@@ -10,6 +10,17 @@ npm install upag-js
 
 ## Usage
 
+### Script tag (no bundler)
+
+`dist/upag.js` is a single file that sets `window.UpagJs`. It needs no `type="module"`:
+
+```html
+<script src="https://js.upag.io/v1/upag.js"></script>
+<script>
+  const upag = new UpagJs('pk_test_xxx');
+</script>
+```
+
 ### Initialize the client
 
 ```javascript
@@ -97,6 +108,29 @@ const paymentMethod = await upag.paymentMethods.create('cus_123', {
 });
 ```
 
+### Cards
+
+Tokenizes a card and returns a card id. Your server uses that id to create a charge. The card number and security code are never returned.
+
+```javascript
+const card = await upag.cards.create({
+  number: '4242424242424242',
+  expirationMonth: 12,
+  expirationYear: 2030,
+  cvv: '123',
+  holderName: 'John Doe', // letters and spaces only
+});
+
+console.log(card.id);         // send this to your server
+console.log(card.brand);      // 'visa'
+console.log(card.lastDigits); // '4242'
+
+// Optional: make retries safe
+await upag.cards.create(params, { idempotencyKey: 'checkout_42' });
+```
+
+`create` is the only card operation a public key can perform. Listing, retrieving and removing cards need your secret key, so do those from your server.
+
 ### Antifraud
 
 The antifraud module automatically collects device and browser fingerprinting data (canvas, WebGL, audio hashes, bot detection, etc.) and creates a session.
@@ -108,6 +142,58 @@ const session = await upag.antifraud.createSession();
 console.log(session.id);        // antifraud session ID
 console.log(session.expiresAt); // session expiry
 ```
+
+### 3D Secure
+
+Authenticates a saved card with the buyer's bank before you charge it. Your server opens the session with its secret key; the browser only finishes it, using the session's `clientSecret`. The SDK handles device data collection and, when the bank requires it, the challenge window.
+
+**1. Backend** — create the session with your secret key and hand the `clientSecret` to the page:
+
+```bash
+curl -X POST https://api.upag.io/v1/3ds/sessions \
+  -H "Authorization: Bearer $UPAG_SECRET_KEY" \
+  -H "Idempotency-Key: order-10482" \
+  -H "Content-Type: application/json" \
+  -d '{ "amount": 10000, "installments": 3, "card": "<card id>", "customer": "<customer id>" }'
+```
+
+**2. Browser** — authenticate with the `clientSecret`:
+
+```javascript
+try {
+  const { sessionId } = await upag.threeDSecure.authenticate(
+    { clientSecret },
+    {
+      onStatusChange: (status) => console.log(status), // starting | authenticating | completing | idle
+    }
+  );
+
+  // Send sessionId to your backend.
+} catch (error) {
+  if (error.code === 'authentication_canceled') {
+    // The buyer closed the bank window
+  }
+}
+```
+
+**3. Backend** — create the card charge with the completed session:
+
+```bash
+curl -X POST https://api.upag.io/v1/charges \
+  -H "Authorization: Bearer $UPAG_SECRET_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "type": "card", "amount": 10000, "installments": 3, "card": "<card id>", "customer": "<customer id>", "threeDSecureSessionId": "<sessionId>" }'
+```
+
+The session authenticates one card for one amount and installment count, and can be used by one charge only. Keep the `clientSecret` out of logs and URLs: it authorizes this browser to work on the session.
+
+3D Secure talks to the core API, not to the billing API. The environment follows your key (`pk_test_…` is sandbox, `pk_live_…` is production); override it with the `environment` option (`'production'` or `'sandbox'`), or point at any URL with `coreBaseURL`. `coreBaseURL` wins over `environment`, which wins over the key.
+
+```javascript
+const upag = new UpagJs({ publicKey: 'pk_test_xxx', environment: 'sandbox' });
+```
+
+Only one authentication can run at a time. `authenticate` must be called in the browser (not during SSR).
 
 ## Framework Examples
 
@@ -255,6 +341,10 @@ try {
 - `authentication_error` - Invalid public key
 - `network_error` - Network/connection error
 - `client_error` - Client-side error
+- `three_d_secure_error` - 3D Secure authentication did not complete. Check `code`: `authentication_failed`, `authentication_canceled`, `authentication_timeout`, `authentication_unavailable`, `invalid_response`
+- `client_error` with `invalid_params` - the `clientSecret` passed to `threeDSecure.authenticate` is missing
+
+Errors returned by the API carry its `code` (for example `session_expired`, `unauthorized` or `too_many_attempts` on 3D Secure), whichever error format the endpoint uses.
 
 ## API Reference
 
@@ -268,7 +358,9 @@ try {
 | `products` | `listPrices(productId)` | List prices for a product |
 | `products` | `retrievePrice(productId, priceId)` | Retrieve a specific price |
 | `paymentMethods` | `create(customerId, params)` | Create a payment method |
+| `cards` | `create(params, options?)` | Tokenize a card |
 | `antifraud` | `createSession()` | Create antifraud session (auto-collects browser data) |
+| `threeDSecure` | `authenticate({ clientSecret }, options?)` | Run 3D Secure authentication for a session created by your server |
 
 ## Security Best Practices
 

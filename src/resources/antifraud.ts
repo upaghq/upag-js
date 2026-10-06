@@ -6,7 +6,7 @@ export class Antifraud extends BaseResource {
   private collector: DataCollector;
 
   constructor(http: any) {
-    super(http, '/antifraud');
+    super(http, '/billing/antifraud');
     this.collector = new DataCollector();
   }
 

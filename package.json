@@ -5,11 +5,13 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "unpkg": "./dist/upag.js",
+  "jsdelivr": "./dist/upag.js",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.mjs"
     }
   },
   "license": "MIT",
@@ -33,10 +35,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsup --config tsup.browser.config.ts",
     "dev": "tsup --watch",
     "test": "vitest",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm run check:bundle",
+    "check:bundle": "node ./scripts/check-bundle.mjs",
     "release": "./scripts/publish.sh",
     "version:patch": "npm version patch --no-git-tag-version",
     "version:minor": "npm version minor --no-git-tag-version",
@@ -48,14 +51,12 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=14.0.0"
-  },
-  "dependencies": {
-    "axios": "^1.6.0"
+    "node": ">=18.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "jsdom": "^29.0.0",
+    "marlim-sdk-3ds": "^1.0.9",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"

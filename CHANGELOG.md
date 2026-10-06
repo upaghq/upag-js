@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Script-tag build, `dist/upag.js`: a single self-contained file that sets `window.UpagJs`, so it works with a plain `<script src>` and no bundler or `type="module"`.
+- `cards.create(params, { idempotencyKey? })`: tokenizes a card with a public key (`POST /v1/cards`).
+- `threeDSecure.authenticate({ clientSecret })`: 3D Secure authentication for saved cards, with device data collection and bank challenge handled in the browser. Your server creates the session with its secret key; the browser starts and completes it with the session's `clientSecret`, and the charge is created with `threeDSecureSessionId`. `threeDSecure` has not been published yet, so this is its first release.
+- `environment` (`'production' | 'sandbox'`) and `coreBaseURL` options, which select the core API used by 3D Secure. Without them the environment follows the key (`pk_test_` is sandbox). Billing resources are unaffected.
+- The HTTP client reads both error formats: fields at the top of the body (billing) and nested under `error` (core).
+- `check:bundle` script, run before publishing, to ensure the 3D Secure browser module is bundled into `dist` and not required at runtime.
+
+### Changed
+- **Breaking**: the HTTP client uses the native `fetch` instead of `axios`, so `upag-js` has no runtime dependencies. It requires an environment with `fetch` (all current browsers, Node 18+); `engines.node` is now `>=18`. Errors keep the same shape; a request that exceeds `timeout` is reported as a `network_error`.
+- **Breaking (unreleased `threeDSecure`)**: `authenticate` takes `{ clientSecret }` instead of `{ checkoutSessionId, paymentMethodId, installments }`, and no longer creates the session. The progress status `'creating_session'` is now `'starting'`, and `ThreeDSecureSession` no longer carries `checkoutSessionId` or `paymentMethodId`.
+
+### Fixed
+- The HTTP client no longer sets a `User-Agent` header, which browsers refuse to let scripts set and reported as an error on every request.
+- `exports` in `package.json` now lists `types` first, so TypeScript resolves the type definitions under `moduleResolution: bundler`/`node16`.
+
 ## [1.0.0] - 2025-01-XX
 
 ### Added
