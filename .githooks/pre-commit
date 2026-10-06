@@ -1,0 +1,12 @@
+# #!/usr/bin/env bash
+# set -euo pipefail
+
+# branch=$(git rev-parse --abbrev-ref HEAD)
+# case "$branch" in
+#   main)
+#     echo "✖ commit direto em $branch não é permitido — abra uma branch"
+#     exit 1;;
+# esac
+
+# echo "→ testando"
+# npm run test

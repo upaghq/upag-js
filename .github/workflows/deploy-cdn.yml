@@ -1,0 +1,94 @@
+name: Deploy CDN
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'src/**'
+      - 'tsup.config.ts'
+      - 'tsup.browser.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-cdn.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.ref_name == 'main' || github.ref_name == 'staging'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    concurrency:
+      group: deploy-cdn-${{ github.ref_name }}
+      cancel-in-progress: false
+
+    steps:
+      # An environment without its own variables would fall back to the repo-level (production) secrets.
+      - name: Require environment configuration
+        env:
+          CDN_URL: ${{ vars.CDN_URL }}
+        run: |
+          : "${CDN_URL:?Set the CDN_URL variable on the '${{ github.ref_name }}' environment}"
+
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Require dist/v1
+        run: |
+          test -d dist/v1
+          test -f dist/v1/upag.min.js
+          test -f dist/v1/shopify/checkout.min.js
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone for R2
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf << EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.CDN_R2_ACCESS_KEY_ID }}
+          secret_access_key = ${{ secrets.CDN_R2_SECRET_ACCESS_KEY }}
+          endpoint = https://${{ secrets.CDN_CF_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          acl = private
+          EOF
+
+      - name: Sync dist/v1 to R2
+        run: |
+          rclone sync ./dist/v1 r2:${{ secrets.CDN_R2_BUCKET_NAME }}/v1 \
+            --header-upload "Cache-Control: public, max-age=31536000, immutable" \
+            --checksum \
+            --verbose
+
+      - name: Purge Cloudflare Cache
+        if: success()
+        env:
+          CDN_URL: ${{ vars.CDN_URL }}
+          CF_ZONE_ID: ${{ secrets.CDN_CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CDN_CF_API_TOKEN }}
+        run: |
+          # Cloudflare accepts at most 30 URLs per purge request.
+          # CDN_URL is the public prefix of /v1 (e.g. https://js.upag.io/v1).
+          (cd dist/v1 && find . -type f | sed "s|^\./|${CDN_URL%/}/|") \
+            | jq -R . \
+            | jq -s -c '[range(0; length; 30) as $i | .[$i:$i + 30]] | .[] | {files: .}' \
+            | while read -r body; do
+                curl --fail-with-body -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+                  -H "Authorization: Bearer ${CF_API_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  --data "$body"
+                echo
+              done
