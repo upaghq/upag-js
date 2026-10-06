@@ -149,7 +149,7 @@ try {
 curl -X POST https://api.upag.io/v1/charges \
   -H "Authorization: Bearer $UPAG_SECRET_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "type": "card", "amount": 10000, "installments": 3, "card": "<card id>", "customer": "<customer id>", "threeDSecureSessionId": "<sessionId>" }'
+  -d '{ "type": "card", "amount": 10000, "installments": 3, "card": "<card id>", "customer": "<customer id>", "threeDSecureSession": "<sessionId>" }'
 ```
 
 The session authenticates one card for one amount and installment count, and can be used by one charge only. Keep the `clientSecret` out of logs and URLs: it authorizes this browser to work on the session.

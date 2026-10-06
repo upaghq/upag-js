@@ -31,7 +31,7 @@ export type CardStatus = 'active' | 'invalid' | 'removed';
 
 export interface Card {
   id: string;
-  customerId: string | null;
+  customer: string | null;
   brand: CardBrand;
   firstDigits: string;
   lastDigits: string;
@@ -229,6 +229,8 @@ export interface CheckoutPayload {
   layout: CheckoutLayout | null;
   publishableKey: string | null;
   payment: CheckoutPayment | null;
+  /** When true, card pays must authenticate 3DS before confirm. */
+  threeDSecureEnabled: boolean;
 }
 
 export interface CheckoutStartPayload extends CheckoutPayload {
@@ -284,7 +286,7 @@ export interface ConfirmCardPayment {
   /** Tokenized card id from `cards.create`. */
   card: string;
   installments?: number;
-  threeDSecureSessionId?: string;
+  threeDSecureSession?: string;
   ipAddress?: string;
   location?: {
     city?: string | null;
@@ -346,7 +348,7 @@ export interface ThreeDSecureSession {
 }
 
 export interface ThreeDSecureResult {
-  /** Send this id to your backend as `threeDSecureSessionId` when creating the charge. */
+  /** Send this id to your backend as `threeDSecureSession` when creating the charge. */
   sessionId: string;
   status: 'completed';
 }

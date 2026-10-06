@@ -5,6 +5,7 @@ import { UpagJs } from '../src/client';
 import type {
   Card,
   CheckoutSession,
+  ConfirmCardPayment,
   ConfirmCheckoutSessionParams,
   CreateCardParams,
   Price,
@@ -61,6 +62,8 @@ describe('public surface', () => {
     expectTypeOf<CreateCardParams>().toHaveProperty('expirationMonth');
     expectTypeOf<CreateCardParams>().not.toHaveProperty('customerId');
     expectTypeOf<Card>().toHaveProperty('lastDigits');
+    expectTypeOf<Card>().toHaveProperty('customer');
+    expectTypeOf<Card>().not.toHaveProperty('customerId');
   });
 
   it('types: dates that arrive as ISO strings are typed as string', () => {
@@ -76,6 +79,8 @@ describe('public surface', () => {
     expectTypeOf<ConfirmCheckoutSessionParams>().not.toHaveProperty('customerId');
     expectTypeOf<CheckoutSession>().not.toHaveProperty('customerId');
     expectTypeOf<CheckoutSession>().toHaveProperty('customer');
+    expectTypeOf<ConfirmCardPayment>().toHaveProperty('threeDSecureSession');
+    expectTypeOf<ConfirmCardPayment>().not.toHaveProperty('threeDSecureSessionId');
   });
 
   it('removed types are not exported from the source entry', () => {
