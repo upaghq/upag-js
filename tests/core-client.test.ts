@@ -15,25 +15,16 @@ function headersOf(http: unknown): Record<string, string> {
 }
 
 describe('API base URL', () => {
-  it('defaults to production', () => {
-    expect(resolveBaseURL({ publicKey: 'pk_xxx' })).toBe(PRODUCTION);
-  });
-
-  it('defaults a live or unknown key to production', () => {
+  it('sends a pk_test_ key to sandbox and anything else to production', () => {
+    expect(resolveBaseURL({ publicKey: 'pk_test_abc' })).toBe(SANDBOX);
     expect(resolveBaseURL({ publicKey: 'pk_live_abc' })).toBe(PRODUCTION);
     expect(resolveBaseURL({ publicKey: 'pk_xxx' })).toBe(PRODUCTION);
   });
 
-  it('lets an explicit environment override the key', () => {
-    expect(resolveBaseURL({ publicKey: 'pk_live_abc', environment: 'sandbox' })).toBe(SANDBOX);
-    expect(resolveBaseURL({ publicKey: 'pk_test_abc', environment: 'production' })).toBe(PRODUCTION);
-  });
-
-  it('lets baseURL override everything', () => {
+  it('lets baseURL override the host inferred from the key', () => {
     expect(
       resolveBaseURL({
         publicKey: 'pk_test_abc',
-        environment: 'production',
         baseURL: 'http://localhost:3000/v1',
       })
     ).toBe('http://localhost:3000/v1');
@@ -42,18 +33,18 @@ describe('API base URL', () => {
 
 describe('UpagJs clients', () => {
   it('sends cards, checkout and 3D Secure to the same API host', () => {
-    const upag = new UpagJs({ publicKey: 'pk_test_abc', environment: 'sandbox' }) as any;
+    const upag = new UpagJs({ publicKey: 'pk_test_abc' }) as any;
 
     expect(baseURLOf(upag.http)).toBe(SANDBOX);
     expect(upag.cards.http).toBe(upag.http);
     expect(upag.checkout.http).toBe(upag.http);
     expect(upag.threeDSecure.http).toBe(upag.http);
+    expect(upag.antifraud).toBeDefined();
   });
 
   it('lets baseURL override the host for every resource', () => {
     const upag = new UpagJs({
       publicKey: 'pk_live_abc',
-      environment: 'sandbox',
       baseURL: 'https://api.example/v1',
     }) as any;
 
@@ -61,7 +52,7 @@ describe('UpagJs clients', () => {
   });
 
   it('authenticates both clients with the same public key', () => {
-    const upag = new UpagJs({ publicKey: 'pk_test_abc', environment: 'sandbox' }) as any;
+    const upag = new UpagJs({ publicKey: 'pk_test_abc' }) as any;
 
     expect(headersOf(upag.http).Authorization).toBe('Bearer pk_test_abc');
 

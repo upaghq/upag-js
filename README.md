@@ -12,10 +12,10 @@ npm install upag-js
 
 ### Script tag (no bundler)
 
-`dist/upag.js` is a single file that sets `window.UpagJs`. It needs no `type="module"`:
+`dist/v1/upag.min.js` is a single file that sets `window.UpagJs`. It needs no `type="module"`:
 
 ```html
-<script src="https://js.upag.io/v1/upag.js"></script>
+<script src="https://js.upag.io/v1/upag.min.js"></script>
 <script>
   const upag = new UpagJs('pk_test_xxx');
 </script>
@@ -101,6 +101,15 @@ await upag.cards.create(params, { idempotencyKey: 'checkout_42' });
 
 `create` is the only card operation a public key can perform. Listing, retrieving and removing cards need your secret key, so do those from your server.
 
+### Antifraud
+
+Constructing the client in a browser starts the device profiler. A `pk_test_` key uses the sandbox org; any other key uses production. Send `sessionId()` as `meta.session_id` on the card charge. Call `rotate()` before a retry.
+
+```javascript
+const deviceSessionId = upag.antifraud.sessionId();
+upag.antifraud.rotate();
+```
+
 ### 3D Secure
 
 Authenticates a saved card with the buyer's bank before you charge it. Your server opens the session with its secret key; the browser only finishes it, using the session's `clientSecret`. The SDK handles device data collection and, when the bank requires it, the challenge window.
@@ -145,11 +154,7 @@ curl -X POST https://api.upag.io/v1/charges \
 
 The session authenticates one card for one amount and installment count, and can be used by one charge only. Keep the `clientSecret` out of logs and URLs: it authorizes this browser to work on the session.
 
-3D Secure talks to the same host as cards and checkout. The environment follows your key (`pk_test_…` is sandbox, `pk_live_…` is production); override it with the `environment` option (`'production'` or `'sandbox'`), or point at any URL with `baseURL`. `baseURL` wins over `environment`.
-
-```javascript
-const upag = new UpagJs({ publicKey: 'pk_test_xxx', environment: 'sandbox' });
-```
+3D Secure talks to the same host as cards and checkout. The host follows your key (`pk_test_…` is sandbox, `pk_live_…` is production). Override it with `baseURL`.
 
 Only one authentication can run at a time. `authenticate` must be called in the browser (not during SSR).
 

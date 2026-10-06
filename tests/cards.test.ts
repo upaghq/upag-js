@@ -32,7 +32,7 @@ function makeHttp() {
 
 describe('Cards', () => {
   it('is exposed on the client and shares its http client', () => {
-    const upag = new UpagJs({ publicKey: 'pk_test_abc', environment: 'sandbox' }) as any;
+    const upag = new UpagJs({ publicKey: 'pk_test_abc' }) as any;
 
     expect(upag.cards).toBeInstanceOf(Cards);
     expect(upag.cards.http).toBe(upag.http);

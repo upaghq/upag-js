@@ -1,18 +1,11 @@
 // Configuration
-export type UpagEnvironment = 'production' | 'sandbox';
-
 export interface UpagJsConfig {
   /** Your public key (`pk_test_...` or `pk_live_...`). Never a secret key. */
   publicKey: string;
   /**
-   * Which Upag environment to call: `production` (`https://api.upag.io/v1`) or
-   * `sandbox` (`https://api.upag.dev/v1`). Defaults to `production`. It is never
-   * inferred from the key, and a key that contradicts it is rejected.
-   */
-  environment?: UpagEnvironment;
-  /**
    * Overrides the API base URL (including `/v1`), mainly for local development.
-   * Must be `https`, except for `localhost`. Takes precedence over `environment`.
+   * Must be `https`, except for `localhost`. Takes precedence over the host
+   * inferred from the key (`pk_test_` → sandbox, anything else → production).
    */
   baseURL?: string;
   /** Request timeout in ms (default 30000). */

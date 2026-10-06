@@ -11,12 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Script-tag build, `dist/upag.js`: a single self-contained file that sets `window.UpagJs`, so it works with a plain `<script src>` and no bundler or `type="module"`.
 - `cards.create(params, { idempotencyKey? })`: tokenizes a card with a public key (`POST /v1/cards`).
 - `threeDSecure.authenticate({ clientSecret })`: 3D Secure authentication for saved cards, with device data collection and bank challenge handled in the browser. Your server creates the session with its secret key; the browser starts and completes it with the session's `clientSecret`, and the charge is created with `threeDSecureSessionId`. `threeDSecure` has not been published yet, so this is its first release.
-- `environment` (`'production' | 'sandbox'`) and `baseURL` select the API host for cards, checkout and 3D Secure. A `pk_test_` key on production (the default) is rejected.
+- The API host follows the key (`pk_test_` → sandbox, anything else → production). `baseURL` still overrides it for local development.
 - Shopper checkout: `checkout.start`, `retrieve`, `confirm`, `applyCoupon`, `removeCoupon`, `redirectToCheckout`.
+- `antifraud`: device session on the client (`sessionId`, `rotate`). Starts with `new UpagJs(...)`. A `pk_test_` key uses the sandbox org; any other key uses production. Send `sessionId()` as `meta.session_id` on a card charge.
 - The HTTP client reads both error formats: fields at the top of the body (billing) and nested under `error` (core). It can omit `Authorization` or send a session `clientSecret`.
 - `check:bundle` script, run before publishing, to ensure the 3D Secure browser module is bundled into `dist` and not required at runtime.
 
 ### Changed
+- **Breaking**: `environment` is gone. The API host and the antifraud org follow the key (`pk_test_` → sandbox / test, `pk_live_` → production / live). `baseURL` still overrides the host.
 - **Breaking**: the HTTP client uses the native `fetch` instead of `axios`, so `upag-js` has no runtime dependencies. It requires an environment with `fetch` (all current browsers, Node 18+); `engines.node` is now `>=18`. Errors keep the same shape; a request that exceeds `timeout` is reported as a `network_error`.
 - **Breaking (unreleased `threeDSecure`)**: `authenticate` takes `{ clientSecret }` instead of `{ checkoutSessionId, paymentMethodId, installments }`, and no longer creates the session. The progress status `'creating_session'` is now `'starting'`, and `ThreeDSecureSession` no longer carries `checkoutSessionId` or `paymentMethodId`.
 - **Breaking**: old billing methods are gone (`checkout.createSession`, `customers`, `products`, `paymentMethods`, `antifraud`, and the unreleased `upag.billing.*` catalog). A public key cannot create sessions or list products. Shopper checkout is `upag.checkout.start` (`POST /checkout/payment-links/:code/sessions`, no auth), then `retrieve` / `confirm` / `applyCoupon` / `removeCoupon` with the session `clientSecret`. Confirm takes inline `customer` + `payment: { method: 'pix' | 'card' }`. Amounts are integer cents; line `price` is the expanded price, not `priceId`.

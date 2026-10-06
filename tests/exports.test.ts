@@ -19,30 +19,34 @@ const REMOVED_TYPES = [
   'CreatePaymentMethodParams',
   'PaymentMethodType',
   'CheckoutPaymentMethod',
+  'UpagEnvironment',
 ];
 
 describe('public surface', () => {
   const upag = new UpagJs({ publicKey: 'pk_live_abc' }) as any;
 
-  it('keeps cards, threeDSecure and checkout at the top level', () => {
+  it('keeps cards, threeDSecure, checkout and antifraud at the top level', () => {
     expect(upag.cards).toBeDefined();
     expect(upag.threeDSecure).toBeDefined();
     expect(upag.checkout).toBeDefined();
+    expect(upag.antifraud).toBeDefined();
     expect(upag.billing).toBeUndefined();
   });
 
-  it('no longer exposes customers, payment methods, catalog or antifraud', () => {
-    for (const name of ['customers', 'paymentMethods', 'products', 'prices', 'antifraud', 'billing']) {
+  it('no longer exposes customers, payment methods or catalog', () => {
+    for (const name of ['customers', 'paymentMethods', 'products', 'prices', 'billing']) {
       expect(upag[name], name).toBeUndefined();
     }
   });
 
   it('does not export removed resource classes', () => {
-    for (const name of ['Customers', 'PaymentMethods', 'Billing', 'Antifraud', 'Products']) {
+    for (const name of ['Customers', 'PaymentMethods', 'Billing', 'Products']) {
       expect((sdk as Record<string, unknown>)[name], name).toBeUndefined();
     }
     expect(sdk.Checkout).toBeDefined();
+    expect(sdk.Antifraud).toBeDefined();
     expect((sdk as Record<string, unknown>).ShopifyCheckoutSnippet).toBeUndefined();
+    expect((sdk as Record<string, unknown>).AntifraudSnippet).toBeUndefined();
   });
 
   it('does not offer merchant create or catalog list on checkout', () => {

@@ -1,5 +1,5 @@
 import { UpagJsConfig, UpagError } from '../types';
-import { resolveBaseURL } from './api-base-url';
+import { resolveBaseURL, resolveEnvironment } from './api-base-url';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -16,14 +16,16 @@ export interface RequestOptions {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
-class TimeoutSignal extends Error {}
+class TimeoutSignal extends Error { }
 
 export class HttpClient {
+  readonly environment: 'production' | 'sandbox';
   private baseURL: string;
   private timeout: number;
   private headers: Record<string, string>;
 
   constructor(config: UpagJsConfig) {
+    this.environment = resolveEnvironment(config.publicKey);
     this.baseURL = resolveBaseURL(config);
     this.timeout = config.timeout || DEFAULT_TIMEOUT_MS;
     this.headers = {
