@@ -1,81 +1,22 @@
 // Configuration
+export type UpagEnvironment = 'production' | 'sandbox';
+
 export interface UpagJsConfig {
+  /** Your public key (`pk_test_...` or `pk_live_...`). Never a secret key. */
   publicKey: string;
-  baseURL?: string;
-  timeout?: number;
   /**
-   * Environment of the core API, which serves 3D Secure. When omitted it follows the
-   * key (`pk_test_` is sandbox, `pk_live_` is production) and defaults to production.
+   * Which Upag environment to call: `production` (`https://api.upag.io/v1`) or
+   * `sandbox` (`https://api.upag.dev/v1`). Defaults to `production`. It is never
+   * inferred from the key, and a key that contradicts it is rejected.
    */
-  environment?: 'production' | 'sandbox';
-}
-
-// Common types
-export interface ListResponse<T> {
-  data: T[];
-  hasMore: boolean;
-  total?: number;
-}
-
-// Customer types
-export interface Customer {
-  id: string;
-  livemode: boolean;
-  name: string | null;
-  email: string;
-  phone: string | null;
-  taxId: string | null;
-  line1: string | null;
-  line2: string | null;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  zipCode: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CreateCustomerParams {
-  email: string;
-  name: string;
-  phone?: string;
-  taxId?: string;
-  line1?: string | null;
-  line2?: string | null;
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
-  zipCode?: string | null;
-}
-
-// Payment Method types
-export type PaymentMethodType = 'credit_card' | 'pix' | 'boleto';
-
-export interface PaymentMethod {
-  id: string;
-  customerId: string;
-  type: PaymentMethodType;
-  card?: {
-    brand: string;
-    last4: string;
-    expMonth: number;
-    expYear: number;
-  };
-  pix?: {
-    key?: string;
-  };
-  createdAt: Date;
-}
-
-export interface CreatePaymentMethodParams {
-  type: PaymentMethodType;
-  card?: {
-    number: string;
-    expMonth: number;
-    expYear: number;
-    cvc: string;
-    holderName: string;
-  };
+  environment?: UpagEnvironment;
+  /**
+   * Overrides the API base URL (including `/v1`), mainly for local development.
+   * Must be `https`, except for `localhost`. Takes precedence over `environment`.
+   */
+  baseURL?: string;
+  /** Request timeout in ms (default 30000). */
+  timeout?: number;
 }
 
 // Card types
@@ -130,17 +71,16 @@ export interface CreateCardOptions {
   idempotencyKey?: string;
 }
 
-// Product types
+// Catalog shapes nested on a checkout payload
 export interface Product {
   id: string;
   name: string;
   description: string;
   image: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// Price types
 export type BillingType = 'one_time' | 'recurring';
 export type RecurringInterval = 'day' | 'week' | 'month' | 'year';
 
@@ -151,130 +91,228 @@ export interface Price {
   interval: RecurringInterval | null;
   intervalCount: number | null;
   currency: string;
+  /** Integer cents. */
   amount: number;
-  createdAt: Date;
-  updatedAt: Date;
+  metadata: Record<string, string | boolean>;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// Checkout types
-export interface CheckoutSessionProduct {
-  id: string;
-  name: string;
-  description: string;
-  image: string | null;
-}
+export type CheckoutSessionPrice = Price & { product: Product | null };
 
-export interface CheckoutSessionPrice {
-  id: string;
-  name: string;
-  billingType: BillingType;
-  interval: RecurringInterval | null;
-  intervalCount: number | null;
-  currency: string;
-  amount: number;
-  product?: CheckoutSessionProduct;
-}
+export type CheckoutPaymentMethodType = 'pix' | 'card';
 
-export interface CheckoutSessionItem {
-  id: string;
-  priceId: string;
-  quantity: number;
-  price?: CheckoutSessionPrice;
-}
+export type CheckoutSessionStatus = 'open' | 'complete' | 'expired';
 
 export type BillingAddressCollection = 'auto' | 'required' | 'none';
 
+export interface CheckoutSessionItem {
+  id: string;
+  quantity: number;
+  price: CheckoutSessionPrice | null;
+}
+
+export interface CheckoutSessionBump {
+  id: string;
+  quantity: number;
+  /** Integer cents. */
+  amount: number;
+  title: string | null;
+  description: string | null;
+  price: CheckoutSessionPrice | null;
+}
+
+export interface CheckoutSessionDiscount {
+  id: string;
+  item: string;
+  coupon: string;
+  type: 'coupon';
+  /** Integer cents. */
+  amount: number;
+}
+
 export interface CheckoutSession {
   id: string;
-  status: 'open' | 'complete' | 'expired';
-  customerId: string | null;
-  url: string;
+  customer: string | null;
+  checkoutLayout: string | null;
+  paymentLink: string | null;
+  paymentMethods: CheckoutPaymentMethodType[];
+  status: CheckoutSessionStatus;
+  url: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
   billingAddressCollection: BillingAddressCollection;
   successUrl: string | null;
   cancelUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  expiresAt: Date | null;
+  latitude: number | null;
+  longitude: number | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  invoice: string | null;
+  couponEnabled: boolean;
+  couponCode: string | null;
   items: CheckoutSessionItem[];
+  bumps: CheckoutSessionBump[];
+  discounts: CheckoutSessionDiscount[];
 }
 
-export interface CreateCheckoutSessionParams {
-  customerId?: string | null;
-  items: { priceId: string; quantity: number }[];
-  paymentMethods?: PaymentMethodType[];
-  billingAddressCollection?: BillingAddressCollection;
-  successUrl?: string | null;
-  cancelUrl?: string | null;
+export interface CheckoutInstallmentOption {
+  installments: number;
+  /** Integer cents for one installment. */
+  amount: number;
+  /** Integer cents for the whole charge. */
+  total: number;
 }
 
-// Antifraud types
-export interface AntifraudDeviceInfo {
-  screenWidth?: number;
-  screenHeight?: number;
-  availWidth?: number;
-  availHeight?: number;
-  colorDepth?: number;
-  pixelRatio?: number;
-  hardwareConcurrency?: number;
-  deviceMemory?: number;
-  maxTouchPoints?: number;
+export type CheckoutAvailablePaymentMethod =
+  | { type: 'pix' }
+  | { type: 'card'; installments: CheckoutInstallmentOption[] };
+
+export interface CheckoutAccount {
+  displayName: string | null;
+  legalName: string | null;
+  email: string | null;
 }
 
-export interface AntifraudBrowserInfo {
-  platform?: string;
-  vendor?: string;
-  language?: string;
-  languages?: string[];
-  cookieEnabled?: boolean;
-  doNotTrack?: string | null;
-  pdfViewerEnabled?: boolean;
+export interface CheckoutLayoutTheme {
+  radius: string;
+  font?: string;
+  background: string;
+  foreground: string;
+  card: string;
+  'card-foreground': string;
+  popover: string;
+  'popover-foreground': string;
+  primary: string;
+  'primary-foreground': string;
+  secondary: string;
+  'secondary-foreground': string;
+  muted: string;
+  'muted-foreground': string;
+  accent: string;
+  'accent-foreground': string;
+  destructive: string;
+  'destructive-foreground': string;
+  success: string;
+  'success-foreground': string;
+  warning: string;
+  'warning-foreground': string;
+  border: string;
+  input: string;
+  ring: string;
 }
 
-export interface AntifraudTimeInfo {
-  timezone?: string;
-  timezoneOffset?: number;
+export interface CheckoutLayout {
+  theme: CheckoutLayoutTheme;
+  favicon: string | null;
+  desktop: Record<string, unknown> | null;
+  mobile: Record<string, unknown> | null;
 }
 
-export interface AntifraudHashesInfo {
-  canvas?: string;
-  webgl?: string;
-  audio?: string;
-  fonts?: string;
+export type CheckoutPaymentStatus =
+  | 'pending'
+  | 'paid'
+  | 'expired'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'failed'
+  | 'in_review'
+  | 'chargeback';
+
+export interface CheckoutPayment {
+  method: CheckoutPaymentMethodType;
+  status: CheckoutPaymentStatus;
+  qrCode: string | null;
+  expiresAt: string | null;
 }
 
-export interface AntifraudGraphicsInfo {
-  webglRenderer?: string;
-  webglVendor?: string;
+/** Shopper checkout page payload. `clientSecret` is only on `start`. */
+export interface CheckoutPayload {
+  checkoutSession: CheckoutSession;
+  paymentMethods: CheckoutAvailablePaymentMethod[];
+  account: CheckoutAccount;
+  layout: CheckoutLayout | null;
+  publishableKey: string | null;
+  payment: CheckoutPayment | null;
 }
 
-export interface AntifraudConnectionInfo {
-  type?: string;
-  effectiveType?: string;
-  downlink?: number;
+export interface CheckoutStartPayload extends CheckoutPayload {
+  clientSecret: string;
 }
 
-export interface AntifraudBotInfo {
-  webdriver?: boolean;
-  automationFlags?: string[];
+export interface StartCheckoutSessionParams {
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
+  clickId?: string | null;
 }
 
-export interface CreateAntifraudSessionParams {
-  fingerprint?: string;
-  device?: AntifraudDeviceInfo;
-  browser?: AntifraudBrowserInfo;
-  time?: AntifraudTimeInfo;
-  hashes?: AntifraudHashesInfo;
-  graphics?: AntifraudGraphicsInfo;
-  connection?: AntifraudConnectionInfo;
-  bot?: AntifraudBotInfo;
+export interface CheckoutCustomerPhone {
+  countryCode: string;
+  areaCode: string;
+  number: string;
 }
 
-export interface AntifraudSession {
-  id: string;
-  expiresAt: Date;
+export interface CheckoutCustomerDocument {
+  type: 'cpf' | 'cnpj';
+  number: string;
 }
 
-// 3D Secure types
+export interface CheckoutCustomerAddress {
+  street?: string | null;
+  number?: string | null;
+  complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  zip?: string | null;
+}
+
+export interface ConfirmCheckoutCustomer {
+  name: string;
+  email?: string | null;
+  phone?: CheckoutCustomerPhone | null;
+  document: CheckoutCustomerDocument;
+  address?: CheckoutCustomerAddress | null;
+}
+
+export interface ConfirmPixPayment {
+  method: 'pix';
+  dueDate?: string;
+}
+
+export interface ConfirmCardPayment {
+  method: 'card';
+  /** Tokenized card id from `cards.create`. */
+  card: string;
+  installments?: number;
+  threeDSecureSessionId?: string;
+  ipAddress?: string;
+  location?: {
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+    zip?: string | null;
+  };
+  softDescriptor?: string;
+}
+
+export interface ConfirmCheckoutSessionParams {
+  customer: ConfirmCheckoutCustomer;
+  bumps?: string[];
+  payment: ConfirmPixPayment | ConfirmCardPayment;
+}
+
+export interface ApplyCheckoutCouponParams {
+  code: string;
+}
+
+// 3D Secure
 export type ThreeDSecureSessionStatus =
   | 'requires_action'
   | 'completed'

@@ -6,6 +6,12 @@ const DEFAULT_TIMEOUT_MS = 30000;
 export interface RequestOptions {
   /** Extra headers for this request only. */
   headers?: Record<string, string>;
+  /**
+   * Who authorizes this request. Default is the client's public key.
+   * `"none"` omits `Authorization` (public payment-link start).
+   * `{ clientSecret }` is the shopper credential for one checkout session.
+   */
+  auth?: 'none' | { clientSecret: string };
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -54,7 +60,7 @@ export class HttpClient {
     try {
       response = await globalThis.fetch(this.buildUrl(url), {
         method,
-        headers: { ...this.headers, ...options?.headers },
+        headers: this.buildHeaders(options),
         body: data === undefined ? undefined : JSON.stringify(data),
         signal: controller.signal,
       });
@@ -77,6 +83,18 @@ export class HttpClient {
     }
   }
 
+  private buildHeaders(options?: RequestOptions): Record<string, string> {
+    const headers = { ...this.headers, ...options?.headers };
+    if (options?.auth === 'none') {
+      delete headers.Authorization;
+      return headers;
+    }
+    if (options?.auth && typeof options.auth === 'object') {
+      headers.Authorization = `Bearer ${options.auth.clientSecret}`;
+    }
+    return headers;
+  }
+
   private buildUrl(url: string): string {
     if (/^https?:\/\//i.test(url)) return url;
     return `${this.baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
@@ -94,7 +112,7 @@ export class HttpClient {
   }
 
   private handleErrorResponse(status: number, data: any): UpagError {
-    // Billing answers with the fields at the top of the body; the core nests them
+    // Billing answers with the fields at the top of the body; the rest of the API nests them
     // under `error`. Both are read the same way.
     const body: any = data?.error && typeof data.error === 'object' ? data.error : data;
     return {

@@ -19,9 +19,9 @@ describe('API base URL', () => {
     expect(resolveBaseURL({ publicKey: 'pk_xxx' })).toBe(PRODUCTION);
   });
 
-  it('follows the environment the key was issued for', () => {
-    expect(resolveBaseURL({ publicKey: 'pk_test_abc' })).toBe(SANDBOX);
+  it('defaults a live or unknown key to production', () => {
     expect(resolveBaseURL({ publicKey: 'pk_live_abc' })).toBe(PRODUCTION);
+    expect(resolveBaseURL({ publicKey: 'pk_xxx' })).toBe(PRODUCTION);
   });
 
   it('lets an explicit environment override the key', () => {
@@ -41,26 +41,27 @@ describe('API base URL', () => {
 });
 
 describe('UpagJs clients', () => {
-  it('sends 3D Secure to the API and leaves billing where it was', () => {
-    const upag = new UpagJs({ publicKey: 'pk_test_abc' }) as any;
+  it('sends cards, checkout and 3D Secure to the same API host', () => {
+    const upag = new UpagJs({ publicKey: 'pk_test_abc', environment: 'sandbox' }) as any;
 
     expect(baseURLOf(upag.http)).toBe(SANDBOX);
+    expect(upag.cards.http).toBe(upag.http);
+    expect(upag.checkout.http).toBe(upag.http);
     expect(upag.threeDSecure.http).toBe(upag.http);
-    expect(upag.products.http).toBe(upag.http);
   });
 
-  it('does not move billing with baseURL or environment', () => {
+  it('lets baseURL override the host for every resource', () => {
     const upag = new UpagJs({
       publicKey: 'pk_live_abc',
       environment: 'sandbox',
-      baseURL: 'https://billing.example/v1',
+      baseURL: 'https://api.example/v1',
     }) as any;
 
-    expect(baseURLOf(upag.http)).toBe('https://billing.example/v1');
+    expect(baseURLOf(upag.http)).toBe('https://api.example/v1');
   });
 
   it('authenticates both clients with the same public key', () => {
-    const upag = new UpagJs('pk_test_abc') as any;
+    const upag = new UpagJs({ publicKey: 'pk_test_abc', environment: 'sandbox' }) as any;
 
     expect(headersOf(upag.http).Authorization).toBe('Bearer pk_test_abc');
 
@@ -110,13 +111,29 @@ describe('HttpClient', () => {
   it('merges per-request headers and sends no body on GET', async () => {
     const fetchMock = stubFetch(async () => jsonResponse(200, {}));
 
-    await client().get('products', { headers: { 'X-Test': '1' } });
+    await client().get('cards', { headers: { 'X-Test': '1' } });
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('https://api.test/v1/products');
+    expect(url).toBe('https://api.test/v1/cards');
     expect(init.method).toBe('GET');
     expect(init.body).toBeUndefined();
     expect((init.headers as Record<string, string>)['X-Test']).toBe('1');
+  });
+
+  it('omits Authorization when auth is none', async () => {
+    const fetchMock = stubFetch(async () => jsonResponse(201, {}));
+
+    await client().post('/checkout/payment-links/code/sessions', {}, { auth: 'none' });
+
+    expect((fetchMock.mock.calls[0][1].headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it('sends a client secret instead of the public key', async () => {
+    const fetchMock = stubFetch(async () => jsonResponse(200, {}));
+
+    await client().get('/checkout/sessions/1', { auth: { clientSecret: 'cs_secret' } });
+
+    expect((fetchMock.mock.calls[0][1].headers as Record<string, string>).Authorization).toBe('Bearer cs_secret');
   });
 
   it('returns undefined for an empty body', async () => {

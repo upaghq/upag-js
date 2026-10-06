@@ -32,81 +32,51 @@ const upag = new UpagJs('pk_test_your_public_key');
 
 > **Important**: Always use your **public key** (`pk_test_xxx` or `pk_live_xxx`) in frontend code, never your secret key!
 
-### Checkout Sessions
+### Checkout
 
-Create a checkout session with price items and redirect the customer to the hosted checkout page.
+A public key cannot create sessions or list the catalog. The shopper page starts from a payment-link code (no auth), then reads and pays the session with the `clientSecret` returned once by `start`. Tokenize cards with `pk_`.
 
 ```javascript
-const session = await upag.checkout.createSession({
-  items: [
-    { priceId: 'prc_123', quantity: 1 },
-    { priceId: 'prc_456', quantity: 2 },
-  ],
-  successUrl: 'https://yoursite.com/success',
-  cancelUrl: 'https://yoursite.com/cancel',
-  paymentMethods: ['credit_card', 'pix'],
-  billingAddressCollection: 'required',
-  customerId: 'cus_123', // optional
+const { clientSecret, checkoutSession, publishableKey } = await upag.checkout.start('link-code', {
+  utmSource: 'ads',
 });
 
-// Redirect to checkout
-window.location.href = session.url;
+const fresh = await upag.checkout.retrieve(checkoutSession.id, clientSecret);
 
-// Or use the helper to create and redirect in one step
-await upag.checkout.redirectToCheckout({
-  items: [{ priceId: 'prc_123', quantity: 1 }],
-  successUrl: 'https://yoursite.com/success',
-  cancelUrl: 'https://yoursite.com/cancel',
-});
-```
-
-### Customers
-
-```javascript
-const customer = await upag.customers.create({
-  email: 'customer@example.com',
-  name: 'John Doe',
-  phone: '+5511999999999',
-  taxId: '12345678900',
-  line1: 'Rua Example, 123',
-  city: 'São Paulo',
-  state: 'SP',
-  country: 'BR',
-  zipCode: '01001000',
-});
-```
-
-### Products & Prices
-
-```javascript
-// List all products
-const { data: products } = await upag.products.list();
-
-// Retrieve a specific product
-const product = await upag.products.retrieve('prd_123');
-
-// List prices for a product
-const { data: prices } = await upag.products.listPrices('prd_123');
-
-// Retrieve a specific price
-const price = await upag.products.retrievePrice('prd_123', 'prc_456');
-```
-
-### Payment Methods
-
-```javascript
-// Create a payment method for a customer
-const paymentMethod = await upag.paymentMethods.create('cus_123', {
-  type: 'credit_card',
-  card: {
-    number: '4242424242424242',
-    expMonth: 12,
-    expYear: 2027,
-    cvc: '123',
-    holderName: 'John Doe',
+const paid = await upag.checkout.confirm(checkoutSession.id, clientSecret, {
+  customer: {
+    name: 'Jane Doe',
+    email: 'jane@example.com',
+    document: { type: 'cpf', number: '52998224725' },
   },
+  payment: { method: 'pix' },
 });
+
+// Card: tokenize first, then confirm with the card id
+const card = await upag.cards.create({
+  number: '4242424242424242',
+  expirationMonth: 12,
+  expirationYear: 2030,
+  cvv: '123',
+  holderName: 'Jane Doe',
+});
+
+await upag.checkout.confirm(checkoutSession.id, clientSecret, {
+  customer: {
+    name: 'Jane Doe',
+    document: { type: 'cpf', number: '52998224725' },
+  },
+  payment: { method: 'card', card: card.id, installments: 1 },
+});
+
+await upag.checkout.applyCoupon(checkoutSession.id, clientSecret, { code: 'SAVE10' });
+await upag.checkout.removeCoupon(checkoutSession.id, clientSecret);
+
+// Or send the browser to the hosted page
+await upag.checkout.redirectToCheckout('link-code');
 ```
+
+Creating sessions, products and prices is done from your server with a secret key.
 
 ### Cards
 
@@ -130,18 +100,6 @@ await upag.cards.create(params, { idempotencyKey: 'checkout_42' });
 ```
 
 `create` is the only card operation a public key can perform. Listing, retrieving and removing cards need your secret key, so do those from your server.
-
-### Antifraud
-
-The antifraud module automatically collects device and browser fingerprinting data (canvas, WebGL, audio hashes, bot detection, etc.) and creates a session.
-
-```javascript
-// Auto-collect all browser data and create session
-const session = await upag.antifraud.createSession();
-
-console.log(session.id);        // antifraud session ID
-console.log(session.expiresAt); // session expiry
-```
 
 ### 3D Secure
 
@@ -187,7 +145,7 @@ curl -X POST https://api.upag.io/v1/charges \
 
 The session authenticates one card for one amount and installment count, and can be used by one charge only. Keep the `clientSecret` out of logs and URLs: it authorizes this browser to work on the session.
 
-3D Secure talks to the core API, not to the billing API. The environment follows your key (`pk_test_…` is sandbox, `pk_live_…` is production); override it with the `environment` option (`'production'` or `'sandbox'`), or point at any URL with `coreBaseURL`. `coreBaseURL` wins over `environment`, which wins over the key.
+3D Secure talks to the same host as cards and checkout. The environment follows your key (`pk_test_…` is sandbox, `pk_live_…` is production); override it with the `environment` option (`'production'` or `'sandbox'`), or point at any URL with `baseURL`. `baseURL` wins over `environment`.
 
 ```javascript
 const upag = new UpagJs({ publicKey: 'pk_test_xxx', environment: 'sandbox' });
@@ -205,19 +163,13 @@ import { UpagJs } from 'upag-js';
 
 const upag = new UpagJs('pk_test_your_public_key');
 
-function CheckoutButton({ priceId }) {
+function CheckoutButton({ code }) {
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = async () => {
     setLoading(true);
     try {
-      const session = await upag.checkout.createSession({
-        items: [{ priceId, quantity: 1 }],
-        successUrl: `${window.location.origin}/success`,
-        cancelUrl: `${window.location.origin}/cancel`,
-      });
-
-      window.location.href = session.url;
+      await upag.checkout.redirectToCheckout(code);
     } catch (error) {
       console.error('Checkout error:', error);
     } finally {
@@ -246,7 +198,7 @@ function CheckoutButton({ priceId }) {
 import { ref } from 'vue';
 import { UpagJs } from 'upag-js';
 
-const props = defineProps({ priceId: String });
+const props = defineProps({ code: String });
 
 const upag = new UpagJs('pk_test_your_public_key');
 const loading = ref(false);
@@ -254,13 +206,7 @@ const loading = ref(false);
 async function handleCheckout() {
   loading.value = true;
   try {
-    const session = await upag.checkout.createSession({
-      items: [{ priceId: props.priceId, quantity: 1 }],
-      successUrl: `${window.location.origin}/success`,
-      cancelUrl: `${window.location.origin}/cancel`,
-    });
-
-    window.location.href = session.url;
+    await upag.checkout.redirectToCheckout(props.code);
   } catch (error) {
     console.error('Checkout error:', error);
   } finally {
@@ -282,13 +228,7 @@ async function handleCheckout() {
 
   document.getElementById('checkout-btn').addEventListener('click', async () => {
     try {
-      const session = await upag.checkout.createSession({
-        items: [{ priceId: 'prc_123', quantity: 1 }],
-        successUrl: window.location.origin + '/success',
-        cancelUrl: window.location.origin + '/cancel',
-      });
-
-      window.location.href = session.url;
+      await upag.checkout.redirectToCheckout('link-code');
     } catch (error) {
       console.error('Error:', error);
     }
@@ -303,14 +243,11 @@ This library is written in TypeScript and includes type definitions out of the b
 ```typescript
 import {
   UpagJs,
-  CheckoutSession,
-  CreateCheckoutSessionParams,
-  Customer,
-  CreateCustomerParams,
-  Product,
-  Price,
-  PaymentMethod,
-  AntifraudSession,
+  CheckoutPayload,
+  CheckoutStartPayload,
+  ConfirmCheckoutSessionParams,
+  Card,
+  CreateCardParams,
 } from 'upag-js';
 ```
 
@@ -320,11 +257,7 @@ All API errors are thrown with detailed information:
 
 ```javascript
 try {
-  const session = await upag.checkout.createSession({
-    items: [{ priceId: 'prc_123', quantity: 1 }],
-    successUrl: 'https://yoursite.com/success',
-    cancelUrl: 'https://yoursite.com/cancel',
-  });
+  await upag.checkout.start('link-code');
 } catch (error) {
   console.error('Type:', error.type);
   console.error('Message:', error.message);
@@ -350,16 +283,13 @@ Errors returned by the API carry its `code` (for example `session_expired`, `una
 
 | Resource | Method | Description |
 |----------|--------|-------------|
-| `checkout` | `createSession(params)` | Create a checkout session |
-| `checkout` | `redirectToCheckout(params)` | Create session and redirect to checkout URL |
-| `customers` | `create(params)` | Create a customer |
-| `products` | `list()` | List all products |
-| `products` | `retrieve(productId)` | Retrieve a product |
-| `products` | `listPrices(productId)` | List prices for a product |
-| `products` | `retrievePrice(productId, priceId)` | Retrieve a specific price |
-| `paymentMethods` | `create(customerId, params)` | Create a payment method |
+| `checkout` | `start(code, tracking?)` | Open a session from a payment-link code (no auth; returns `clientSecret` once) |
+| `checkout` | `retrieve(sessionId, clientSecret)` | Load the checkout payload |
+| `checkout` | `confirm(sessionId, clientSecret, body)` | Pay with pix or a tokenized card |
+| `checkout` | `applyCoupon(sessionId, clientSecret, { code })` | Apply a coupon |
+| `checkout` | `removeCoupon(sessionId, clientSecret)` | Remove the coupon |
+| `checkout` | `redirectToCheckout(code, tracking?)` | Start and send the browser to the hosted page |
 | `cards` | `create(params, options?)` | Tokenize a card |
-| `antifraud` | `createSession()` | Create antifraud session (auto-collects browser data) |
 | `threeDSecure` | `authenticate({ clientSecret }, options?)` | Run 3D Secure authentication for a session created by your server |
 
 ## Security Best Practices
@@ -367,7 +297,6 @@ Errors returned by the API carry its `code` (for example `session_expired`, `una
 **DO:**
 - Use public keys (`pk_test_xxx` or `pk_live_xxx`) in frontend
 - Use card tokenization for secure card handling
-- Use antifraud sessions to detect suspicious activity
 - Validate input on your backend
 - Use HTTPS in production
 

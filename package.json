@@ -1,6 +1,6 @@
 {
   "name": "upag-js",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "description": "Official Upag JavaScript SDK for frontend applications",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -35,6 +35,7 @@
     "access": "public"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "build": "tsup && tsup --config tsup.browser.config.ts",
     "dev": "tsup --watch",
     "test": "vitest",
