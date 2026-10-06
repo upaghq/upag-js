@@ -1,10 +1,9 @@
 /**
  * Loads the browser authentication module used for 3D Secure.
  *
- * The module is bundled into upag-js at build time (see `noExternal` in tsup.config.ts)
- * and loaded lazily, only when a 3D Secure authentication actually starts. This keeps
- * SSR safe (nothing touches `window` on import) and keeps the module out of the
- * integrator's dependency tree.
+ * The module is first-party (`src/three-d-secure/marlim`) and bundled into upag-js
+ * at build time. It is loaded lazily, only when a 3D Secure authentication actually
+ * starts. This keeps SSR safe (nothing touches `window` on import).
  */
 
 export interface BrowserAuthenticatorInitConfig {
@@ -43,7 +42,7 @@ export const loadBrowserAuthenticator: BrowserAuthenticatorLoader = () => {
       const globals = globalThis as Record<string, unknown>;
       const hadGlobal = Object.prototype.hasOwnProperty.call(globals, GLOBAL_NAME);
 
-      const mod = await import('marlim-sdk-3ds');
+      const mod = await import('../../three-d-secure/marlim');
       const authenticator = pick(mod) ?? pick(globals[GLOBAL_NAME]);
 
       // If importing the module registered a global, remove it so nothing is exposed on the page.
