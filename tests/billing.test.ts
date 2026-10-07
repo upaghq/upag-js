@@ -7,13 +7,21 @@ const SECRET = 'session-id_secret_abc';
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 
 const PAYLOAD = {
-  clientSecret: SECRET,
-  checkoutSession: { id: SESSION_ID, url: 'https://checkout.test/cs/1', status: 'open' },
-  paymentMethods: [{ type: 'pix' }],
-  account: { displayName: 'Store', legalName: null, email: null },
+  id: SESSION_ID,
+  url: 'https://checkout.test/cs/1',
+  status: 'open',
+  paymentMethods: [{ type: 'pix', interestRate: 0, installments: [{ count: 1, amount: 10000, total: 10000 }] }],
+  account: { displayName: 'Store', legalName: null, publishableKey: 'pk_live_abc', threeDSecureEnabled: false },
   layout: null,
-  publishableKey: 'pk_live_abc',
-  payment: null,
+  clientSecret: null,
+  charge: null,
+  invoice: null,
+  customer: null,
+};
+
+const START_PAYLOAD = {
+  ...PAYLOAD,
+  clientSecret: SECRET,
 };
 
 const CONFIRM = {
@@ -21,7 +29,7 @@ const CONFIRM = {
     name: 'Jane Doe',
     document: { type: 'cpf' as const, number: '52998224725' },
   },
-  payment: { method: 'pix' as const },
+  charge: { method: 'pix' as const },
 };
 
 function stubFetch(body: unknown = PAYLOAD) {
@@ -52,12 +60,14 @@ describe('checkout', () => {
   });
 
   it('start posts to the payment-link route with no Authorization', async () => {
-    const fetchMock = stubFetch();
+    const fetchMock = stubFetch(START_PAYLOAD);
     const tracking = { utmSource: 'ads', clickId: 'c1' };
 
     const payload = await upag.checkout.start('link-code', tracking);
 
     expect(payload.clientSecret).toBe(SECRET);
+    expect(payload.id).toBe(SESSION_ID);
+    expect(payload.url).toBe('https://checkout.test/cs/1');
     expect(lastCall(fetchMock)).toEqual({
       url: `${BASE}/checkout/payment-links/link-code/sessions`,
       method: 'POST',
@@ -67,7 +77,7 @@ describe('checkout', () => {
   });
 
   it('retrieve, confirm and coupon send the client secret, not the public key', async () => {
-    const fetchMock = stubFetch({ ...PAYLOAD, clientSecret: undefined });
+    const fetchMock = stubFetch(PAYLOAD);
 
     await upag.checkout.retrieve(SESSION_ID, SECRET);
     expect(lastCall(fetchMock)).toEqual({
@@ -93,6 +103,18 @@ describe('checkout', () => {
       authorization: `Bearer ${SECRET}`,
     });
 
+    await upag.checkout.createThreeDSecureSession(SESSION_ID, SECRET, {
+      card: 'card-1',
+      installments: 3,
+      customer: CONFIRM.customer,
+    });
+    expect(lastCall(fetchMock)).toEqual({
+      url: `${BASE}/checkout/sessions/${SESSION_ID}/3ds/session`,
+      method: 'POST',
+      body: { card: 'card-1', installments: 3, customer: CONFIRM.customer },
+      authorization: `Bearer ${SECRET}`,
+    });
+
     await upag.checkout.removeCoupon(SESSION_ID, SECRET);
     expect(lastCall(fetchMock)).toEqual({
       url: `${BASE}/checkout/sessions/${SESSION_ID}/coupon`,
@@ -103,23 +125,23 @@ describe('checkout', () => {
   });
 
   it('confirm sends pix or card, never priceId or credit_card', async () => {
-    const fetchMock = stubFetch({ ...PAYLOAD, clientSecret: undefined });
+    const fetchMock = stubFetch(PAYLOAD);
     const cardConfirm = {
       customer: CONFIRM.customer,
       bumps: ['22222222-2222-4222-8222-222222222222'],
-      payment: { method: 'card' as const, card: '33333333-3333-4333-8333-333333333333', installments: 2 },
+      charge: { method: 'card' as const, card: '33333333-3333-4333-8333-333333333333', installments: 2 },
     };
 
     await upag.checkout.confirm(SESSION_ID, SECRET, cardConfirm);
 
     const body = lastCall(fetchMock).body as typeof cardConfirm;
-    expect(body.payment).toEqual(cardConfirm.payment);
+    expect(body.charge).toEqual(cardConfirm.charge);
     expect(body).not.toHaveProperty('priceId');
     expect(JSON.stringify(body)).not.toContain('credit_card');
   });
 
   it('redirectToCheckout starts the session and navigates', async () => {
-    stubFetch();
+    stubFetch(START_PAYLOAD);
     const location = { href: '' };
     vi.stubGlobal('window', { location });
 

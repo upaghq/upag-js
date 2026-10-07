@@ -6,6 +6,7 @@ import type {
   Card,
   CheckoutSession,
   ConfirmCardPayment,
+  CheckoutTrial,
   ConfirmCheckoutSessionParams,
   CreateCardParams,
   Price,
@@ -75,12 +76,34 @@ describe('public surface', () => {
 
   it('types: confirm takes inline customer and payment, not customerId', () => {
     expectTypeOf<ConfirmCheckoutSessionParams>().toHaveProperty('customer');
-    expectTypeOf<ConfirmCheckoutSessionParams>().toHaveProperty('payment');
+    expectTypeOf<ConfirmCheckoutSessionParams>().toHaveProperty('charge');
     expectTypeOf<ConfirmCheckoutSessionParams>().not.toHaveProperty('customerId');
     expectTypeOf<CheckoutSession>().not.toHaveProperty('customerId');
     expectTypeOf<CheckoutSession>().toHaveProperty('customer');
     expectTypeOf<ConfirmCardPayment>().toHaveProperty('threeDSecureSession');
     expectTypeOf<ConfirmCardPayment>().not.toHaveProperty('threeDSecureSessionId');
+  });
+
+  it('types: a zero-due session confirms with paymentMethod, never with both keys', () => {
+    const customer = { name: 'Jane', document: { type: 'cpf', number: '52998224725' } } as const;
+
+    expectTypeOf<{ customer: typeof customer; charge: { method: 'pix' } }>().toMatchTypeOf<ConfirmCheckoutSessionParams>();
+    expectTypeOf<{
+      customer: typeof customer;
+      paymentMethod: { type: 'card'; card: string };
+    }>().toMatchTypeOf<ConfirmCheckoutSessionParams>();
+    expectTypeOf<{ customer: typeof customer }>().toMatchTypeOf<ConfirmCheckoutSessionParams>();
+    expectTypeOf<{
+      customer: typeof customer;
+      charge: { method: 'pix' };
+      paymentMethod: { type: 'card'; card: string };
+    }>().not.toMatchTypeOf<ConfirmCheckoutSessionParams>();
+  });
+
+  it('types: the shopper session exposes the trial and the payment method collection', () => {
+    expectTypeOf<CheckoutSession['trial']>().toEqualTypeOf<CheckoutTrial | null>();
+    expectTypeOf<CheckoutSession['paymentMethodCollection']>().toEqualTypeOf<'always' | 'if_required'>();
+    expectTypeOf<CheckoutTrial['endsAt']>().toEqualTypeOf<string | null>();
   });
 
   it('removed types are not exported from the source entry', () => {
