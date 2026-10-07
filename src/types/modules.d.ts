@@ -1,6 +1,2 @@
-// Minimal typing for the bundled browser authentication module.
-// The loader validates its shape at runtime, so no richer types are needed here.
-declare module 'marlim-sdk-3ds' {
-  const mod: unknown;
-  export default mod;
-}
+// Ambient module declarations for third-party packages that ship no types.
+// The 3D Secure browser module is first-party (`src/three-d-secure/marlim`).

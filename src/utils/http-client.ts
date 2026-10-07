@@ -20,12 +20,14 @@ class TimeoutSignal extends Error { }
 
 export class HttpClient {
   readonly environment: 'production' | 'sandbox';
+  readonly publicKey: string;
   private baseURL: string;
   private timeout: number;
   private headers: Record<string, string>;
 
   constructor(config: UpagJsConfig) {
     this.environment = resolveEnvironment(config.publicKey);
+    this.publicKey = config.publicKey;
     this.baseURL = resolveBaseURL(config);
     this.timeout = config.timeout || DEFAULT_TIMEOUT_MS;
     this.headers = {

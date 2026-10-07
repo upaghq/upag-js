@@ -57,7 +57,7 @@ export class ThreeDSecure extends BaseResource {
 
   /**
    * Runs the 3D Secure authentication of a session your server created, in the browser.
-   * Resolves with the session id, to be sent to your backend as `threeDSecureSessionId`
+   * Resolves with the session id, to be sent to your backend as `threeDSecureSession`
    * when it creates the charge.
    */
   async authenticate(

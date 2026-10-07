@@ -5,6 +5,9 @@ import { UpagJs } from '../src/client';
 import type {
   Card,
   CheckoutSession,
+  CheckoutSessionPrice,
+  ConfirmCardPayment,
+  CheckoutTrial,
   ConfirmCheckoutSessionParams,
   CreateCardParams,
   Price,
@@ -53,6 +56,8 @@ describe('public surface', () => {
     expect(upag.checkout.create).toBeUndefined();
     expect(upag.checkout.createSession).toBeUndefined();
     expect(upag.checkout.start).toBeTypeOf('function');
+    expect(upag.checkout.startShopify).toBeTypeOf('function');
+    expect(upag.checkout.listApps).toBeTypeOf('function');
     expect(upag.checkout.retrieve).toBeTypeOf('function');
     expect(upag.checkout.confirm).toBeTypeOf('function');
   });
@@ -61,6 +66,8 @@ describe('public surface', () => {
     expectTypeOf<CreateCardParams>().toHaveProperty('expirationMonth');
     expectTypeOf<CreateCardParams>().not.toHaveProperty('customerId');
     expectTypeOf<Card>().toHaveProperty('lastDigits');
+    expectTypeOf<Card>().toHaveProperty('customer');
+    expectTypeOf<Card>().not.toHaveProperty('customerId');
   });
 
   it('types: dates that arrive as ISO strings are typed as string', () => {
@@ -72,10 +79,40 @@ describe('public surface', () => {
 
   it('types: confirm takes inline customer and payment, not customerId', () => {
     expectTypeOf<ConfirmCheckoutSessionParams>().toHaveProperty('customer');
-    expectTypeOf<ConfirmCheckoutSessionParams>().toHaveProperty('payment');
+    expectTypeOf<ConfirmCheckoutSessionParams>().toHaveProperty('charge');
     expectTypeOf<ConfirmCheckoutSessionParams>().not.toHaveProperty('customerId');
     expectTypeOf<CheckoutSession>().not.toHaveProperty('customerId');
     expectTypeOf<CheckoutSession>().toHaveProperty('customer');
+    expectTypeOf<ConfirmCardPayment>().toHaveProperty('threeDSecureSession');
+    expectTypeOf<ConfirmCardPayment>().not.toHaveProperty('threeDSecureSessionId');
+  });
+
+  it('types: a zero-due session confirms with paymentMethod, never with both keys', () => {
+    const customer = { name: 'Jane', document: { type: 'cpf', number: '52998224725' } } as const;
+
+    expectTypeOf<{ customer: typeof customer; charge: { method: 'pix' } }>().toMatchTypeOf<ConfirmCheckoutSessionParams>();
+    expectTypeOf<{
+      customer: typeof customer;
+      paymentMethod: { type: 'card'; card: string };
+    }>().toMatchTypeOf<ConfirmCheckoutSessionParams>();
+    expectTypeOf<{ customer: typeof customer }>().toMatchTypeOf<ConfirmCheckoutSessionParams>();
+    expectTypeOf<{
+      customer: typeof customer;
+      charge: { method: 'pix' };
+      paymentMethod: { type: 'card'; card: string };
+    }>().not.toMatchTypeOf<ConfirmCheckoutSessionParams>();
+  });
+
+  it('types: the shopper session exposes the trial and the payment method collection', () => {
+    expectTypeOf<CheckoutSession['trial']>().toEqualTypeOf<CheckoutTrial | null>();
+    expectTypeOf<CheckoutSession['paymentMethodCollection']>().toEqualTypeOf<'always' | 'if_required'>();
+    expectTypeOf<CheckoutTrial['endsAt']>().toEqualTypeOf<string | null>();
+  });
+
+  it('types: shopper line prices omit catalog metadata and timestamps', () => {
+    expectTypeOf<CheckoutSessionPrice>().toHaveProperty('product');
+    expectTypeOf<CheckoutSessionPrice>().not.toHaveProperty('metadata');
+    expectTypeOf<CheckoutSessionPrice>().not.toHaveProperty('createdAt');
   });
 
   it('removed types are not exported from the source entry', () => {

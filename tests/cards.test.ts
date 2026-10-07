@@ -4,7 +4,7 @@ import { Cards } from '../src/resources/cards';
 
 const CARD = {
   id: '6f1c2f0e-7c1b-4f0e-9d53-0d6c0c3b1a11',
-  customerId: null,
+  customer: null,
   brand: 'visa',
   firstDigits: '424242',
   lastDigits: '4242',

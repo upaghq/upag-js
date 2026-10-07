@@ -37,19 +37,20 @@ const upag = new UpagJs('pk_test_your_public_key');
 A public key cannot create sessions or list the catalog. The shopper page starts from a payment-link code (no auth), then reads and pays the session with the `clientSecret` returned once by `start`. Tokenize cards with `pk_`.
 
 ```javascript
-const { clientSecret, checkoutSession, publishableKey } = await upag.checkout.start('link-code', {
+const session = await upag.checkout.start('link-code', {
   utmSource: 'ads',
 });
+const { id, clientSecret } = session;
 
-const fresh = await upag.checkout.retrieve(checkoutSession.id, clientSecret);
+const fresh = await upag.checkout.retrieve(id, clientSecret);
 
-const paid = await upag.checkout.confirm(checkoutSession.id, clientSecret, {
+const paid = await upag.checkout.confirm(id, clientSecret, {
   customer: {
     name: 'Jane Doe',
     email: 'jane@example.com',
     document: { type: 'cpf', number: '52998224725' },
   },
-  payment: { method: 'pix' },
+  charge: { method: 'pix' },
 });
 
 // Card: tokenize first, then confirm with the card id
@@ -61,16 +62,35 @@ const card = await upag.cards.create({
   holderName: 'Jane Doe',
 });
 
-await upag.checkout.confirm(checkoutSession.id, clientSecret, {
+await upag.checkout.confirm(id, clientSecret, {
   customer: {
     name: 'Jane Doe',
     document: { type: 'cpf', number: '52998224725' },
   },
-  payment: { method: 'card', card: card.id, installments: 1 },
+  charge: { method: 'card', card: card.id, installments: 1 },
 });
 
-await upag.checkout.applyCoupon(checkoutSession.id, clientSecret, { code: 'SAVE10' });
-await upag.checkout.removeCoupon(checkoutSession.id, clientSecret);
+// Free trial: when `session.trial` is set and `session.amount` is 0, nothing is
+// charged today. Keep a card for the first charge instead of sending `charge`
+// (optional when `session.paymentMethodCollection` is 'if_required').
+if (session.trial && session.amount === 0) {
+  await upag.checkout.confirm(id, clientSecret, {
+    customer: {
+      name: 'Jane Doe',
+      document: { type: 'cpf', number: '52998224725' },
+    },
+    paymentMethod: { type: 'card', card: card.id },
+  });
+}
+
+await upag.checkout.applyCoupon(id, clientSecret, { code: 'SAVE10' });
+await upag.checkout.removeCoupon(id, clientSecret);
+await upag.checkout.listApps(id, clientSecret);
+
+// Shopify cart → hosted checkout URL
+const shopify = await upag.checkout.startShopify({
+  items: [{ variantId: 'gid://shopify/ProductVariant/1', quantity: 1 }],
+});
 
 // Or send the browser to the hosted page
 await upag.checkout.redirectToCheckout('link-code');
@@ -149,7 +169,7 @@ try {
 curl -X POST https://api.upag.io/v1/charges \
   -H "Authorization: Bearer $UPAG_SECRET_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "type": "card", "amount": 10000, "installments": 3, "card": "<card id>", "customer": "<customer id>", "threeDSecureSessionId": "<sessionId>" }'
+  -d '{ "type": "card", "amount": 10000, "installments": 3, "card": "<card id>", "customer": "<customer id>", "threeDSecureSession": "<sessionId>" }'
 ```
 
 The session authenticates one card for one amount and installment count, and can be used by one charge only. Keep the `clientSecret` out of logs and URLs: it authorizes this browser to work on the session.

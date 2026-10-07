@@ -2,10 +2,15 @@ import { BaseResource } from './base-resource';
 import { HttpClient } from '../utils/http-client';
 import {
   ApplyCheckoutCouponParams,
-  CheckoutPayload,
+  CheckoutPublicAppsResponse,
+  CheckoutSession,
   CheckoutStartPayload,
   ConfirmCheckoutSessionParams,
+  CreateCheckoutThreeDSecureSessionParams,
+  CreatedCheckoutThreeDSecureSession,
   StartCheckoutSessionParams,
+  StartShopifyCheckoutParams,
+  StartShopifyCheckoutResponse,
 } from '../types';
 
 export class Checkout extends BaseResource {
@@ -25,9 +30,21 @@ export class Checkout extends BaseResource {
     );
   }
 
+  /**
+   * Opens a session from a Shopify cart. No Authorization: the publishable key
+   * goes in the body. Returns only the hosted checkout `url`.
+   */
+  async startShopify(params: StartShopifyCheckoutParams): Promise<StartShopifyCheckoutResponse> {
+    return this.http.post<StartShopifyCheckoutResponse>(
+      '/checkout/shopify/sessions',
+      { publishableKey: this.http.publicKey, items: params.items },
+      { auth: 'none' },
+    );
+  }
+
   /** Reloads the checkout page payload for one session. */
-  async retrieve(sessionId: string, clientSecret: string): Promise<CheckoutPayload> {
-    return this.http.get<CheckoutPayload>(this.sessionUrl(sessionId), this.shopperAuth(clientSecret));
+  async retrieve(sessionId: string, clientSecret: string): Promise<CheckoutSession> {
+    return this.http.get<CheckoutSession>(this.sessionUrl(sessionId), this.shopperAuth(clientSecret));
   }
 
   /**
@@ -38,9 +55,27 @@ export class Checkout extends BaseResource {
     sessionId: string,
     clientSecret: string,
     body: ConfirmCheckoutSessionParams,
-  ): Promise<CheckoutPayload> {
-    return this.http.post<CheckoutPayload>(
+  ): Promise<CheckoutSession> {
+    return this.http.post<CheckoutSession>(
       `${this.sessionUrl(sessionId)}/confirm`,
+      body,
+      this.shopperAuth(clientSecret),
+    );
+  }
+
+  /**
+   * Opens a 3D Secure session for this checkout, for a card tokenized with `cards.create`.
+   * Run it with `threeDSecure.authenticate({ clientSecret })`, then confirm with the session
+   * id as `charge.threeDSecureSession`. Answers 404 while 3D Secure is not enabled for the
+   * account (see `account.threeDSecureEnabled`).
+   */
+  async createThreeDSecureSession(
+    sessionId: string,
+    clientSecret: string,
+    body: CreateCheckoutThreeDSecureSessionParams,
+  ): Promise<CreatedCheckoutThreeDSecureSession> {
+    return this.http.post<CreatedCheckoutThreeDSecureSession>(
+      `${this.sessionUrl(sessionId)}/3ds/session`,
       body,
       this.shopperAuth(clientSecret),
     );
@@ -50,17 +85,25 @@ export class Checkout extends BaseResource {
     sessionId: string,
     clientSecret: string,
     params: ApplyCheckoutCouponParams,
-  ): Promise<CheckoutPayload> {
-    return this.http.post<CheckoutPayload>(
+  ): Promise<CheckoutSession> {
+    return this.http.post<CheckoutSession>(
       `${this.sessionUrl(sessionId)}/coupon`,
       params,
       this.shopperAuth(clientSecret),
     );
   }
 
-  async removeCoupon(sessionId: string, clientSecret: string): Promise<CheckoutPayload> {
-    return this.http.delete<CheckoutPayload>(
+  async removeCoupon(sessionId: string, clientSecret: string): Promise<CheckoutSession> {
+    return this.http.delete<CheckoutSession>(
       `${this.sessionUrl(sessionId)}/coupon`,
+      this.shopperAuth(clientSecret),
+    );
+  }
+
+  /** Public config of the account's checkout apps. No credentials. */
+  async listApps(sessionId: string, clientSecret: string): Promise<CheckoutPublicAppsResponse> {
+    return this.http.get<CheckoutPublicAppsResponse>(
+      `${this.sessionUrl(sessionId)}/apps`,
       this.shopperAuth(clientSecret),
     );
   }
@@ -72,10 +115,10 @@ export class Checkout extends BaseResource {
     }
 
     const payload = await this.start(code, tracking);
-    if (!payload.checkoutSession.url) {
+    if (!payload.url) {
       throw { type: 'client_error', message: 'The checkout session has no url' };
     }
-    window.location.href = payload.checkoutSession.url;
+    window.location.href = payload.url;
   }
 
   private sessionUrl(sessionId: string): string {

@@ -31,7 +31,7 @@ export type CardStatus = 'active' | 'invalid' | 'removed';
 
 export interface Card {
   id: string;
-  customerId: string | null;
+  customer: string | null;
   brand: CardBrand;
   firstDigits: string;
   lastDigits: string;
@@ -74,6 +74,14 @@ export interface Product {
   updatedAt: string;
 }
 
+/** Nested product on a shopper checkout line. No timestamps. */
+export interface CheckoutSessionProduct {
+  id: string;
+  name: string;
+  description: string;
+  image: string | null;
+}
+
 export type BillingType = 'one_time' | 'recurring';
 export type RecurringInterval = 'day' | 'week' | 'month' | 'year';
 
@@ -91,7 +99,18 @@ export interface Price {
   updatedAt: string;
 }
 
-export type CheckoutSessionPrice = Price & { product: Product | null };
+/** Nested price on a shopper checkout line. No metadata or timestamps. */
+export interface CheckoutSessionPrice {
+  id: string;
+  name: string;
+  billingType: BillingType;
+  interval: RecurringInterval | null;
+  intervalCount: number | null;
+  currency: string;
+  /** Integer cents. */
+  amount: number;
+  product: CheckoutSessionProduct | null;
+}
 
 export type CheckoutPaymentMethodType = 'pix' | 'card';
 
@@ -124,49 +143,218 @@ export interface CheckoutSessionDiscount {
   amount: number;
 }
 
+export type CheckoutInvoiceStatus = 'draft' | 'open' | 'paid' | 'void' | 'uncollectible';
+
+export interface CheckoutInvoiceItem {
+  id: string;
+  product: string;
+  price: string;
+  name: string;
+  /** Integer cents. */
+  amount: number;
+  quantity: number;
+  /** Integer cents. */
+  totalAmount: number;
+}
+
+export interface CheckoutInvoiceDiscount {
+  id: string;
+  item: string;
+  coupon: string;
+  type: 'coupon';
+  /** Integer cents. */
+  amount: number;
+}
+
+/** `ChargeResourceMapper.toEventResource` — public charge shape. */
+export interface CheckoutCharge {
+  id: string;
+  type: CheckoutPaymentMethodType;
+  status: CheckoutPaymentStatus;
+  /** Integer cents. */
+  amount: number;
+  failureCode: string | null;
+  description: string | null;
+  meta: Record<string, string> | null;
+  customer: string;
+  pix?: { reference: string | null; qrCode: string | null; expiresAt: string | null };
+  card?: {
+    id: string | null;
+    installments: number | null;
+    nsu: string | null;
+    authorizationCode: string | null;
+    acquirerStatusCode: string | null;
+  };
+  splits: Array<{
+    id: string;
+    type: 'mdr' | 'account';
+    status: 'pending' | 'processing' | 'paid' | 'failed';
+    amount: number;
+    account?: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  ipAddress: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CheckoutInvoicePayment {
+  /** Charge id on `GET /invoices`. Expanded charge on checkout confirm. */
+  charge: string | CheckoutCharge;
+  type: CheckoutPaymentMethodType;
+  status: CheckoutPaymentStatus;
+  settledAt: string | null;
+  createdAt: string;
+}
+
+/** `CustomerResourceMapper.toResource` — expanded customer on confirm. */
+export interface CheckoutCustomer {
+  id: string;
+  name: string;
+  email: string | null;
+  document: { number: string; type: 'cpf' | 'cnpj' };
+  phone: { countryCode: string; areaCode: string; number: string } | null;
+  address: {
+    street: string | null;
+    number: string | null;
+    complement: string | null;
+    neighborhood: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    zip: string | null;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Expanded invoice on confirm. Retrieve keeps the invoice id string. */
+export interface CheckoutInvoice {
+  id: string;
+  customer: string;
+  paymentMethod: string | null;
+  subscription: string | null;
+  status: CheckoutInvoiceStatus;
+  currency: string;
+  description: string | null;
+  /** Integer cents. */
+  amountDue: number;
+  /** Integer cents. */
+  amountPaid: number;
+  attemptCount: number;
+  dueDate: string | null;
+  paidAt: string | null;
+  items: CheckoutInvoiceItem[];
+  discounts: CheckoutInvoiceDiscount[];
+  payments: CheckoutInvoicePayment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CheckoutShopperCharge {
+  id: string;
+  type: CheckoutPaymentMethodType;
+  status: CheckoutPaymentStatus;
+  /** Authorized / acquirer amount (Charge.gross). Integer cents. */
+  amount: number;
+  /** Installment interest the payer bears. Integer cents. */
+  interestAmount: number;
+  installments: number;
+  paidAt: string | null;
+  card: { brand: string; last4: string } | null;
+  pix: { copyPaste: string | null; expiresAt: string | null } | null;
+  error: { code: string; message: string } | null;
+  nextAction: null;
+}
+
+export interface CheckoutShopperInvoice {
+  id: string;
+  status: CheckoutInvoiceStatus;
+}
+
+export interface CheckoutShopperCustomer {
+  id: string;
+  name: string;
+  email: string | null;
+  document: { type: 'cpf' | 'cnpj'; number: string };
+  phone?: { countryCode: string; areaCode: string; number: string };
+  address?: CheckoutCustomerAddress;
+}
+
+export type CheckoutTrialInterval = 'day' | 'week' | 'month';
+
+/** Whether a payment method is asked for when nothing is due today. */
+export type CheckoutPaymentMethodCollection = 'always' | 'if_required';
+
+/** Free period before the first charge of a subscription item. */
+export interface CheckoutTrial {
+  interval: CheckoutTrialInterval | null;
+  intervalCount: number | null;
+  /**
+   * Before the session completes this is a preview (a relative trial is counted
+   * from the moment the subscription is created). After, it is the real end.
+   */
+  endsAt: string | null;
+}
+
 export interface CheckoutSession {
   id: string;
-  customer: string | null;
-  checkoutLayout: string | null;
-  paymentLink: string | null;
-  paymentMethods: CheckoutPaymentMethodType[];
   status: CheckoutSessionStatus;
   url: string | null;
+  paymentLink: string | null;
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
-  billingAddressCollection: BillingAddressCollection;
-  successUrl: string | null;
-  cancelUrl: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  country: string | null;
-  region: string | null;
-  city: string | null;
-  invoice: string | null;
-  couponEnabled: boolean;
-  couponCode: string | null;
+  currency: string;
+  /**
+   * Integer cents. What the items cost today. Recurring items under a trial are
+   * not charged yet and add nothing.
+   */
+  subtotal: number;
+  discountAmount: number;
+  amount: number;
   items: CheckoutSessionItem[];
   bumps: CheckoutSessionBump[];
   discounts: CheckoutSessionDiscount[];
+  couponEnabled: boolean;
+  couponCode: string | null;
+  billingAddressCollection: BillingAddressCollection;
+  /** `null` when the session has no trial. */
+  trial: CheckoutTrial | null;
+  paymentMethodCollection: CheckoutPaymentMethodCollection;
+  successUrl: string | null;
+  cancelUrl: string | null;
+  layout: CheckoutLayout | null;
+  paymentMethods: CheckoutAvailablePaymentMethod[];
+  customer: CheckoutShopperCustomer | null;
+  charge: CheckoutShopperCharge | null;
+  invoice: CheckoutShopperInvoice | null;
+  /** Populated only on start. `null` on retrieve, confirm and coupon. */
+  clientSecret: string | null;
+  account: CheckoutAccount;
 }
 
 export interface CheckoutInstallmentOption {
-  installments: number;
-  /** Integer cents for one installment. */
+  count: number;
+  /** First installment in cents. Later parcels are `Math.floor(total / count)`. */
   amount: number;
-  /** Integer cents for the whole charge. */
+  /** What the acquirer is charged. Integer cents. */
   total: number;
 }
 
-export type CheckoutAvailablePaymentMethod =
-  | { type: 'pix' }
-  | { type: 'card'; installments: CheckoutInstallmentOption[] };
+export interface CheckoutAvailablePaymentMethod {
+  type: CheckoutPaymentMethodType;
+  interestRate: number;
+  installments: CheckoutInstallmentOption[];
+}
 
 export interface CheckoutAccount {
   displayName: string | null;
   legalName: string | null;
-  email: string | null;
+  publishableKey: string;
+  threeDSecureEnabled: boolean;
 }
 
 export interface CheckoutLayoutTheme {
@@ -198,10 +386,32 @@ export interface CheckoutLayoutTheme {
 }
 
 export interface CheckoutLayout {
-  theme: CheckoutLayoutTheme;
+  theme: CheckoutLayoutTheme | null;
   favicon: string | null;
   desktop: Record<string, unknown> | null;
   mobile: Record<string, unknown> | null;
+}
+
+export type CheckoutAppType = 'integration' | 'custom';
+export type CheckoutAppProvider = 'meta' | 'spedy' | 'utmify' | 'trackup' | 'shopify';
+
+/** Public config of a checkout app. No credentials. */
+export interface CheckoutPublicApp {
+  type: CheckoutAppType;
+  provider: CheckoutAppProvider;
+  config: Record<string, unknown>;
+}
+
+export interface CheckoutPublicAppsResponse {
+  data: CheckoutPublicApp[];
+}
+
+export interface StartShopifyCheckoutParams {
+  items: Array<{ variantId: string; quantity: number }>;
+}
+
+export interface StartShopifyCheckoutResponse {
+  url: string;
 }
 
 export type CheckoutPaymentStatus =
@@ -219,21 +429,14 @@ export interface CheckoutPayment {
   status: CheckoutPaymentStatus;
   qrCode: string | null;
   expiresAt: string | null;
+  charge: string | CheckoutCharge;
 }
 
-/** Shopper checkout page payload. `clientSecret` is only on `start`. */
-export interface CheckoutPayload {
-  checkoutSession: CheckoutSession;
-  paymentMethods: CheckoutAvailablePaymentMethod[];
-  account: CheckoutAccount;
-  layout: CheckoutLayout | null;
-  publishableKey: string | null;
-  payment: CheckoutPayment | null;
-}
+/** Shopper checkout page payload. Same shape for start, retrieve and confirm. */
+export type CheckoutPayload = CheckoutSession;
 
-export interface CheckoutStartPayload extends CheckoutPayload {
-  clientSecret: string;
-}
+/** Start is the shopper session with a populated `clientSecret`. */
+export type CheckoutStartPayload = CheckoutSession & { clientSecret: string };
 
 export interface StartCheckoutSessionParams {
   utmSource?: string | null;
@@ -284,7 +487,7 @@ export interface ConfirmCardPayment {
   /** Tokenized card id from `cards.create`. */
   card: string;
   installments?: number;
-  threeDSecureSessionId?: string;
+  threeDSecureSession?: string;
   ipAddress?: string;
   location?: {
     city?: string | null;
@@ -295,14 +498,72 @@ export interface ConfirmCardPayment {
   softDescriptor?: string;
 }
 
-export interface ConfirmCheckoutSessionParams {
+/**
+ * A card to keep for the subscription when nothing is charged today (the trial
+ * covers everything). Tokenize it with `cards.create` first.
+ */
+export interface ConfirmCheckoutPaymentMethod {
+  type: 'card';
+  /** Tokenized card id from `cards.create`. */
+  card: string;
+}
+
+interface ConfirmCheckoutSessionBase {
   customer: ConfirmCheckoutCustomer;
   bumps?: string[];
-  payment: ConfirmPixPayment | ConfirmCardPayment;
 }
+
+/** Amount due today is above zero: pay it with `charge`. */
+export interface ConfirmCheckoutSessionWithCharge extends ConfirmCheckoutSessionBase {
+  charge: ConfirmPixPayment | ConfirmCardPayment;
+  paymentMethod?: never;
+}
+
+/**
+ * Amount due today is zero (a trial covers every item): nothing is charged, so
+ * send no `charge`. `paymentMethod` is required when the session's
+ * `paymentMethodCollection` is `always` and optional under `if_required`.
+ */
+export interface ConfirmCheckoutSessionWithPaymentMethod extends ConfirmCheckoutSessionBase {
+  charge?: never;
+  paymentMethod?: ConfirmCheckoutPaymentMethod;
+}
+
+export type ConfirmCheckoutSessionParams =
+  | ConfirmCheckoutSessionWithCharge
+  | ConfirmCheckoutSessionWithPaymentMethod;
 
 export interface ApplyCheckoutCouponParams {
   code: string;
+}
+
+/**
+ * Opens a 3D Secure session for the checkout. The amount comes from the session
+ * (items, accepted bumps and coupon), never from the browser.
+ */
+export interface CreateCheckoutThreeDSecureSessionParams {
+  /** Tokenized card id from `cards.create`. */
+  card: string;
+  /** 1 to 12. Defaults to 1. */
+  installments?: number;
+  /** The payer's data: a public payer cannot name an existing customer. */
+  customer: ConfirmCheckoutCustomer;
+  /** Ids of the session's bumps the payer accepted. */
+  bumps?: string[];
+  /** Sandbox only: always show the bank challenge. */
+  forceChallenge?: boolean;
+}
+
+export interface CreatedCheckoutThreeDSecureSession {
+  /** Send this id as `charge.threeDSecureSession` when you confirm. */
+  id: string;
+  status: ThreeDSecureSessionStatus;
+  /** What the card will be charged, in cents. Fixed when the session is created. */
+  finalAmount: number;
+  card: string;
+  expiresAt: string;
+  /** Pass it to `threeDSecure.authenticate`. Shown only here. */
+  clientSecret: string;
 }
 
 // 3D Secure
@@ -346,7 +607,7 @@ export interface ThreeDSecureSession {
 }
 
 export interface ThreeDSecureResult {
-  /** Send this id to your backend as `threeDSecureSessionId` when creating the charge. */
+  /** Send this id to your backend as `threeDSecureSession` when creating the charge. */
   sessionId: string;
   status: 'completed';
 }
