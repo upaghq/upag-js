@@ -74,6 +74,14 @@ export interface Product {
   updatedAt: string;
 }
 
+/** Nested product on a shopper checkout line. No timestamps. */
+export interface CheckoutSessionProduct {
+  id: string;
+  name: string;
+  description: string;
+  image: string | null;
+}
+
 export type BillingType = 'one_time' | 'recurring';
 export type RecurringInterval = 'day' | 'week' | 'month' | 'year';
 
@@ -91,7 +99,18 @@ export interface Price {
   updatedAt: string;
 }
 
-export type CheckoutSessionPrice = Price & { product: Product | null };
+/** Nested price on a shopper checkout line. No metadata or timestamps. */
+export interface CheckoutSessionPrice {
+  id: string;
+  name: string;
+  billingType: BillingType;
+  interval: RecurringInterval | null;
+  intervalCount: number | null;
+  currency: string;
+  /** Integer cents. */
+  amount: number;
+  product: CheckoutSessionProduct | null;
+}
 
 export type CheckoutPaymentMethodType = 'pix' | 'card';
 
@@ -154,8 +173,9 @@ export interface CheckoutCharge {
   status: CheckoutPaymentStatus;
   /** Integer cents. */
   amount: number;
+  failureCode: string | null;
   description: string | null;
-  meta: Record<string, unknown> | null;
+  meta: Record<string, string> | null;
   customer: string;
   pix?: { reference: string | null; qrCode: string | null; expiresAt: string | null };
   card?: {
@@ -165,6 +185,16 @@ export interface CheckoutCharge {
     authorizationCode: string | null;
     acquirerStatusCode: string | null;
   };
+  splits: Array<{
+    id: string;
+    type: 'mdr' | 'account';
+    status: 'pending' | 'processing' | 'paid' | 'failed';
+    amount: number;
+    account?: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  ipAddress: string | null;
   paidAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -226,7 +256,7 @@ export interface CheckoutInvoice {
 export interface CheckoutShopperCharge {
   id: string;
   type: CheckoutPaymentMethodType;
-  status: CheckoutPaymentStatus | 'requires_action';
+  status: CheckoutPaymentStatus;
   /** Authorized / acquirer amount (Charge.gross). Integer cents. */
   amount: number;
   /** Installment interest the payer bears. Integer cents. */
@@ -245,10 +275,10 @@ export interface CheckoutShopperInvoice {
 }
 
 export interface CheckoutShopperCustomer {
-  id?: string;
+  id: string;
   name: string;
-  email?: string | null;
-  document?: { type: 'cpf' | 'cnpj'; number: string };
+  email: string | null;
+  document: { type: 'cpf' | 'cnpj'; number: string };
   phone?: { countryCode: string; areaCode: string; number: string };
   address?: CheckoutCustomerAddress;
 }
@@ -356,10 +386,32 @@ export interface CheckoutLayoutTheme {
 }
 
 export interface CheckoutLayout {
-  theme: CheckoutLayoutTheme;
+  theme: CheckoutLayoutTheme | null;
   favicon: string | null;
   desktop: Record<string, unknown> | null;
   mobile: Record<string, unknown> | null;
+}
+
+export type CheckoutAppType = 'integration' | 'custom';
+export type CheckoutAppProvider = 'meta' | 'spedy' | 'utmify' | 'trackup' | 'shopify';
+
+/** Public config of a checkout app. No credentials. */
+export interface CheckoutPublicApp {
+  type: CheckoutAppType;
+  provider: CheckoutAppProvider;
+  config: Record<string, unknown>;
+}
+
+export interface CheckoutPublicAppsResponse {
+  data: CheckoutPublicApp[];
+}
+
+export interface StartShopifyCheckoutParams {
+  items: Array<{ variantId: string; quantity: number }>;
+}
+
+export interface StartShopifyCheckoutResponse {
+  url: string;
 }
 
 export type CheckoutPaymentStatus =

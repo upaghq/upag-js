@@ -122,6 +122,29 @@ describe('checkout', () => {
       body: undefined,
       authorization: `Bearer ${SECRET}`,
     });
+
+    await upag.checkout.listApps(SESSION_ID, SECRET);
+    expect(lastCall(fetchMock)).toEqual({
+      url: `${BASE}/checkout/sessions/${SESSION_ID}/apps`,
+      method: 'GET',
+      body: undefined,
+      authorization: `Bearer ${SECRET}`,
+    });
+  });
+
+  it('startShopify posts the publishable key with no Authorization', async () => {
+    const fetchMock = stubFetch({ url: 'https://checkout.test/cs/shopify' });
+    const items = [{ variantId: 'gid://shopify/ProductVariant/1', quantity: 2 }];
+
+    const payload = await upag.checkout.startShopify({ items });
+
+    expect(payload.url).toBe('https://checkout.test/cs/shopify');
+    expect(lastCall(fetchMock)).toEqual({
+      url: `${BASE}/checkout/shopify/sessions`,
+      method: 'POST',
+      body: { publishableKey: 'pk_live_abc', items },
+      authorization: undefined,
+    });
   });
 
   it('confirm sends pix or card, never priceId or credit_card', async () => {

@@ -2,12 +2,15 @@ import { BaseResource } from './base-resource';
 import { HttpClient } from '../utils/http-client';
 import {
   ApplyCheckoutCouponParams,
+  CheckoutPublicAppsResponse,
   CheckoutSession,
   CheckoutStartPayload,
   ConfirmCheckoutSessionParams,
   CreateCheckoutThreeDSecureSessionParams,
   CreatedCheckoutThreeDSecureSession,
   StartCheckoutSessionParams,
+  StartShopifyCheckoutParams,
+  StartShopifyCheckoutResponse,
 } from '../types';
 
 export class Checkout extends BaseResource {
@@ -23,6 +26,18 @@ export class Checkout extends BaseResource {
     return this.http.post<CheckoutStartPayload>(
       `/checkout/payment-links/${encodeURIComponent(code)}/sessions`,
       tracking,
+      { auth: 'none' },
+    );
+  }
+
+  /**
+   * Opens a session from a Shopify cart. No Authorization: the publishable key
+   * goes in the body. Returns only the hosted checkout `url`.
+   */
+  async startShopify(params: StartShopifyCheckoutParams): Promise<StartShopifyCheckoutResponse> {
+    return this.http.post<StartShopifyCheckoutResponse>(
+      '/checkout/shopify/sessions',
+      { publishableKey: this.http.publicKey, items: params.items },
       { auth: 'none' },
     );
   }
@@ -81,6 +96,14 @@ export class Checkout extends BaseResource {
   async removeCoupon(sessionId: string, clientSecret: string): Promise<CheckoutSession> {
     return this.http.delete<CheckoutSession>(
       `${this.sessionUrl(sessionId)}/coupon`,
+      this.shopperAuth(clientSecret),
+    );
+  }
+
+  /** Public config of the account's checkout apps. No credentials. */
+  async listApps(sessionId: string, clientSecret: string): Promise<CheckoutPublicAppsResponse> {
+    return this.http.get<CheckoutPublicAppsResponse>(
+      `${this.sessionUrl(sessionId)}/apps`,
       this.shopperAuth(clientSecret),
     );
   }

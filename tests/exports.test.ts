@@ -5,6 +5,7 @@ import { UpagJs } from '../src/client';
 import type {
   Card,
   CheckoutSession,
+  CheckoutSessionPrice,
   ConfirmCardPayment,
   CheckoutTrial,
   ConfirmCheckoutSessionParams,
@@ -55,6 +56,8 @@ describe('public surface', () => {
     expect(upag.checkout.create).toBeUndefined();
     expect(upag.checkout.createSession).toBeUndefined();
     expect(upag.checkout.start).toBeTypeOf('function');
+    expect(upag.checkout.startShopify).toBeTypeOf('function');
+    expect(upag.checkout.listApps).toBeTypeOf('function');
     expect(upag.checkout.retrieve).toBeTypeOf('function');
     expect(upag.checkout.confirm).toBeTypeOf('function');
   });
@@ -104,6 +107,12 @@ describe('public surface', () => {
     expectTypeOf<CheckoutSession['trial']>().toEqualTypeOf<CheckoutTrial | null>();
     expectTypeOf<CheckoutSession['paymentMethodCollection']>().toEqualTypeOf<'always' | 'if_required'>();
     expectTypeOf<CheckoutTrial['endsAt']>().toEqualTypeOf<string | null>();
+  });
+
+  it('types: shopper line prices omit catalog metadata and timestamps', () => {
+    expectTypeOf<CheckoutSessionPrice>().toHaveProperty('product');
+    expectTypeOf<CheckoutSessionPrice>().not.toHaveProperty('metadata');
+    expectTypeOf<CheckoutSessionPrice>().not.toHaveProperty('createdAt');
   });
 
   it('removed types are not exported from the source entry', () => {

@@ -85,6 +85,12 @@ if (session.trial && session.amount === 0) {
 
 await upag.checkout.applyCoupon(id, clientSecret, { code: 'SAVE10' });
 await upag.checkout.removeCoupon(id, clientSecret);
+await upag.checkout.listApps(id, clientSecret);
+
+// Shopify cart → hosted checkout URL
+const shopify = await upag.checkout.startShopify({
+  items: [{ variantId: 'gid://shopify/ProductVariant/1', quantity: 1 }],
+});
 
 // Or send the browser to the hosted page
 await upag.checkout.redirectToCheckout('link-code');
