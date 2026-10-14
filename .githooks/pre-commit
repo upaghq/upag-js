@@ -1,12 +1,31 @@
-# #!/usr/bin/env bash
-# set -euo pipefail
+#!/usr/bin/env bash
+# Blocks commits on main and on branches that do not follow the naming convention.
+# The convention itself lives in .github/scripts/branch-bump.sh (shared with CI).
+# Bypass in an emergency with: git commit --no-verify
+set -euo pipefail
 
-# branch=$(git rev-parse --abbrev-ref HEAD)
-# case "$branch" in
-#   main)
-#     echo "✖ commit direto em $branch não é permitido — abra uma branch"
-#     exit 1;;
-# esac
+branch="$(git symbolic-ref --quiet --short HEAD || true)"
 
-# echo "→ testando"
-# npm run test
+# Detached HEAD (rebase, bisect, checkout of a tag): nothing to validate.
+[ -z "$branch" ] && exit 0
+
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "error: direct commits to '$branch' are not allowed." >&2
+  echo "Create a branch first, e.g.: git switch -c feat/my-change" >&2
+  exit 1
+fi
+
+root="$(git rev-parse --show-toplevel)"
+result="$("$root/.github/scripts/branch-bump.sh" "$branch")"
+
+if [ "$result" = "invalid" ]; then
+  echo "error: branch '$branch' does not follow the naming convention." >&2
+  echo "Valid prefixes:" >&2
+  echo "  major/*, breaking/*          -> major release" >&2
+  echo "  feat/*, feature/*, minor/*   -> minor release" >&2
+  echo "  fix/*, hotfix/*, patch/*     -> patch release" >&2
+  echo "  docs/*, chore/*, ci/*        -> no release" >&2
+  echo "  staging                      -> deploy-only branch, no release" >&2
+  echo "Rename it with: git branch -m <new-name>" >&2
+  exit 1
+fi

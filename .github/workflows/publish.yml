@@ -1,64 +1,113 @@
-name: Publish Upag JavaScript SDK
+name: Publish
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version type to bump (patch, minor, major) or skip to use current version'
-        required: false
-        default: 'skip'
-        type: choice
-        options:
-          - skip
-          - patch
-          - minor
-          - major
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Release: tag must start with v (e.g. v1.0.5). Manual run: only from main.
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/v'))
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # A release tag can point at any commit, so make sure it's reachable from main.
-      - name: Ensure commit is on main
+      - name: Detect bump type from the merged PR branch
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
-          git fetch origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::Commit $GITHUB_SHA is not on main. Publishing is only allowed from main."
+          set -euo pipefail
+          branch="$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[0].head.ref // empty')"
+          if [ -z "$branch" ]; then
+            echo "No PR associated with $SHA (direct push?). Nothing to publish."
+            type=none
+          else
+            type="$(.github/scripts/branch-bump.sh "$branch")"
+            [ "$type" = "invalid" ] && type=none
+            echo "PR branch '$branch' -> $type"
+          fi
+          echo "type=$type" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.type != 'none'
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm >= 11.5.1
+      - name: Upgrade npm
+        if: steps.detect.outputs.type != 'none'
+        run: npm install -g npm@latest
+
+      - name: Install, test, build
+        if: steps.detect.outputs.type != 'none'
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run build
+          npm run check:bundle
+
+      - name: Compute new version
+        id: version
+        if: steps.detect.outputs.type != 'none'
+        env:
+          BUMP: ${{ steps.detect.outputs.type }}
+        run: |
+          set -euo pipefail
+          last="$(git tag --list 'v*' --sort=-v:refname | sed -n 1p)"
+          if [ -z "$last" ]; then
+            echo "::error::Nenhuma tag v* encontrada. Crie a tag da versão atual publicada no npm."
+            exit 1
+          fi
+          if ! [[ "$last" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Última tag '$last' não é um semver X.Y.Z válido."
             exit 1
           fi
 
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+          npm version "${last#v}" --no-git-tag-version --allow-same-version
+          npm version "$BUMP" --no-git-tag-version
 
-      - name: Install dependencies
-        run: npm ci
+          name="$(node -p "require('./package.json').name")"
+          new="$(node -p "require('./package.json').version")"
 
-      - name: Build
-        run: npm run build
+          if out="$(npm view "$name@$new" version 2>&1)"; then
+            if [ -n "$out" ]; then
+              echo "::error::$name@$new já existe no npm. Última tag: $last. Corrija as tags antes de publicar."
+              exit 1
+            fi
+          elif ! grep -q 'E404' <<<"$out"; then
+            echo "::error::Falha ao consultar o npm: $out"
+            exit 1
+          fi
 
-      - name: Run tests
-        run: npm test -- --run
-
-      - name: Bump version
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'skip' && github.event.inputs.version != ''
-        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          echo "Last tag: $last -> new version: $new ($BUMP)"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
-        run: npm publish --access public
+        if: steps.detect.outputs.type != 'none'
+        run: npm publish --provenance --access public
+
+      - name: Tag the release
+        if: steps.detect.outputs.type != 'none'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"

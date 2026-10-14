@@ -33,6 +33,7 @@ describe('public surface', () => {
     expect(upag.threeDSecure).toBeDefined();
     expect(upag.checkout).toBeDefined();
     expect(upag.antifraud).toBeDefined();
+    expect(upag.files).toBeDefined();
     expect(upag.billing).toBeUndefined();
   });
 

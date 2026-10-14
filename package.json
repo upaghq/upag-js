@@ -1,6 +1,6 @@
 {
   "name": "upag-js",
-  "version": "2.0.0",
+  "version": "1.0.4",
   "description": "Official Upag JavaScript SDK for frontend applications",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -29,22 +29,18 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/upag/upag-js"
+    "url": "git+https://github.com/upaghq/upag-js.git"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "[ -n \"$CI\" ] || git config core.hooksPath .githooks || true",
     "build": "tsup && tsup --config tsup.browser.config.ts",
     "dev": "tsup --watch",
     "test": "vitest",
-    "prepublishOnly": "npm run build && npm run check:bundle",
-    "check:bundle": "node ./scripts/check-bundle.mjs",
-    "release": "./scripts/publish.sh",
-    "version:patch": "npm version patch --no-git-tag-version",
-    "version:minor": "npm version minor --no-git-tag-version",
-    "version:major": "npm version major --no-git-tag-version"
+    "check:bundle": "node ./scripts/check-bundle.mjs"
   },
   "files": [
     "dist",
