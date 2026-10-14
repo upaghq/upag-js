@@ -51,6 +51,18 @@ describe('UpagJs clients', () => {
     expect(baseURLOf(upag.http)).toBe('https://api.example/v1');
   });
 
+  it('exposes the environment resolved from the key', () => {
+    expect(new UpagJs({ publicKey: 'pk_test_abc' }).environment).toBe('sandbox');
+    expect(new UpagJs({ publicKey: 'pk_live_abc' }).environment).toBe('production');
+    expect(new UpagJs('pk_xxx').environment).toBe('production');
+  });
+
+  it('keeps the environment of the key when baseURL overrides the host', () => {
+    const upag = new UpagJs({ publicKey: 'pk_test_abc', baseURL: 'http://localhost:3000/v1' });
+
+    expect(upag.environment).toBe('sandbox');
+  });
+
   it('authenticates both clients with the same public key', () => {
     const upag = new UpagJs({ publicKey: 'pk_test_abc' }) as any;
 
@@ -97,6 +109,18 @@ describe('HttpClient', () => {
       Authorization: 'Bearer pk_test_abc',
       'Content-Type': 'application/json',
     });
+  });
+
+  it('sends FormData as is, without a fixed Content-Type', async () => {
+    const fetchMock = stubFetch(async () => jsonResponse(201, { id: 'x' }));
+    const form = new FormData();
+    form.append('purpose', 'business_logo');
+
+    await client().post('/files', form);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBe(form);
+    expect(init.headers).toEqual({ Authorization: 'Bearer pk_test_abc' });
   });
 
   it('merges per-request headers and sends no body on GET', async () => {

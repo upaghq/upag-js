@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate branch name
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          result="$(.github/scripts/branch-bump.sh "$HEAD_REF")"
+          if [ "$result" = "invalid" ]; then
+            echo "::error::Branch '$HEAD_REF' does not follow the naming convention."
+            echo "Valid prefixes:"
+            echo "  major/*, breaking/*          -> major release"
+            echo "  feat/*, feature/*, minor/*   -> minor release"
+            echo "  fix/*, hotfix/*, patch/*     -> patch release"
+            echo "  docs/*, chore/*, ci/*        -> no release"
+            echo "  staging                      -> deploy-only branch, no release"
+            exit 1
+          fi
+          echo "Branch '$HEAD_REF' -> $result"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run check:bundle
+      - run: npm pack --dry-run

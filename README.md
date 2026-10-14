@@ -30,6 +30,12 @@ import { UpagJs } from 'upag-js';
 const upag = new UpagJs('pk_test_your_public_key');
 ```
 
+The environment follows the key: `pk_test_` is `sandbox`, anything else is `production`. It decides the API host and the antifraud org, and is readable as `upag.environment`. `baseURL` overrides the host only (for local development).
+
+```javascript
+upag.environment; // 'sandbox' | 'production'
+```
+
 > **Important**: Always use your **public key** (`pk_test_xxx` or `pk_live_xxx`) in frontend code, never your secret key!
 
 ### Checkout
@@ -52,6 +58,10 @@ const paid = await upag.checkout.confirm(id, clientSecret, {
   },
   charge: { method: 'pix' },
 });
+
+// Boleto: needs a full address and phone on the customer. On a subscription a new boleto is issued each cycle.
+// The confirmed charge stays pending and carries charge.boleto.digitableLine / pdfUrl.
+// charge: { method: 'boleto' }
 
 // Card: tokenize first, then confirm with the card id
 const card = await upag.cards.create({
@@ -120,6 +130,27 @@ await upag.cards.create(params, { idempotencyKey: 'checkout_42' });
 ```
 
 `create` is the only card operation a public key can perform. Listing, retrieving and removing cards need your secret key, so do those from your server.
+
+### Files
+
+Uploads a file, such as a logo or a product image, and returns it with a public `url`.
+
+```javascript
+const input = document.querySelector('input[type="file"]');
+
+const file = await upag.files.create({
+  file: input.files[0], // a File or a Blob
+  purpose: 'business_logo',
+  name: 'Store logo', // optional, defaults to the file name
+});
+
+console.log(file.id);
+console.log(file.url); // CDN address of the file
+```
+
+A public key can upload only the public purposes: `business_icon`, `business_logo`, `product_image`, `user_profile_picture` and `checkout_asset`. Any other purpose (`dispute_evidence`, `identity_document`, `content_delivery`, `social_contract`, `other`) is private, has `url: null` and needs your secret key, so upload those from your server.
+
+Accepted formats are JPEG, PNG, WEBP, PDF and CSV, up to 10 MB. The API checks the content of the file, not the type you declare. Images are resized to fit 1080x720 and recompressed. Uploads from a public key are rate limited, and past the limit the call fails with code `too_many_uploads`.
 
 ### Antifraud
 

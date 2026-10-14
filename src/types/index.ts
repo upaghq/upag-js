@@ -112,7 +112,7 @@ export interface CheckoutSessionPrice {
   product: CheckoutSessionProduct | null;
 }
 
-export type CheckoutPaymentMethodType = 'pix' | 'card';
+export type CheckoutPaymentMethodType = 'pix' | 'card' | 'boleto';
 
 export type CheckoutSessionStatus = 'open' | 'complete' | 'expired';
 
@@ -177,7 +177,17 @@ export interface CheckoutCharge {
   description: string | null;
   meta: Record<string, string> | null;
   customer: string;
-  pix?: { reference: string | null; qrCode: string | null; expiresAt: string | null };
+  pix?: {
+    /** Public URL of the QR code PNG. `null` when it could not be generated. */
+    qrCodeUrl: string | null;
+    /** Pix BR Code (copia e cola). */
+    copyPaste: string | null;
+    expiresAt: string | null;
+    /** @deprecated Transaction id of the QR code. */
+    reference: string | null;
+    /** @deprecated Use `copyPaste`. */
+    qrCode: string | null;
+  };
   card?: {
     id: string | null;
     installments: number | null;
@@ -253,6 +263,15 @@ export interface CheckoutInvoice {
   updatedAt: string;
 }
 
+/** Boleto issued by the shopper confirm. Pending until paid. */
+export interface ShopperBoleto {
+  barcode: string | null;
+  digitableLine: string | null;
+  pdfUrl: string | null;
+  dueDate: string | null;
+  lastPayableDate: string | null;
+}
+
 export interface CheckoutShopperCharge {
   id: string;
   type: CheckoutPaymentMethodType;
@@ -264,7 +283,8 @@ export interface CheckoutShopperCharge {
   installments: number;
   paidAt: string | null;
   card: { brand: string; last4: string } | null;
-  pix: { copyPaste: string | null; expiresAt: string | null } | null;
+  pix: { qrCodeUrl: string | null; copyPaste: string | null; expiresAt: string | null } | null;
+  boleto: ShopperBoleto | null;
   error: { code: string; message: string } | null;
   nextAction: null;
 }
@@ -482,6 +502,11 @@ export interface ConfirmPixPayment {
   dueDate?: string;
 }
 
+/** The backend sets the due date; the customer needs a full address and phone. On a subscription a new boleto is issued each cycle. */
+export interface ConfirmBoletoPayment {
+  method: 'boleto';
+}
+
 export interface ConfirmCardPayment {
   method: 'card';
   /** Tokenized card id from `cards.create`. */
@@ -515,7 +540,7 @@ interface ConfirmCheckoutSessionBase {
 
 /** Amount due today is above zero: pay it with `charge`. */
 export interface ConfirmCheckoutSessionWithCharge extends ConfirmCheckoutSessionBase {
-  charge: ConfirmPixPayment | ConfirmCardPayment;
+  charge: ConfirmPixPayment | ConfirmCardPayment | ConfirmBoletoPayment;
   paymentMethod?: never;
 }
 
@@ -619,4 +644,42 @@ export interface UpagError {
   code?: string;
   statusCode?: number;
   details?: any;
+}
+
+// File types
+/**
+ * What a file is for. The public purposes are served from the CDN (the file has a `url`),
+ * so a public key can upload only these; the others stay private and need your secret key.
+ */
+export type FilePurpose =
+  | 'business_icon'
+  | 'business_logo'
+  | 'product_image'
+  | 'user_profile_picture'
+  | 'checkout_asset'
+  | 'dispute_evidence'
+  | 'identity_document'
+  | 'content_delivery'
+  | 'social_contract'
+  | 'other';
+
+export interface UpagFile {
+  id: string;
+  name: string;
+  /** Bytes stored. Images are resized and recompressed on upload, so this can be smaller than the original. */
+  size: number;
+  contentType: string;
+  purpose: FilePurpose;
+  /** Public URL of the file. `null` for private purposes. */
+  url: string | null;
+  /** ISO 8601 timestamp, as sent by the API. */
+  createdAt: string;
+}
+
+export interface CreateFileParams {
+  /** JPEG, PNG, WEBP, PDF or CSV, up to 10 MB. The content is checked, not the type you declare. */
+  file: Blob | File;
+  purpose: FilePurpose;
+  /** Defaults to the file's own name. Up to 255 characters. */
+  name?: string;
 }

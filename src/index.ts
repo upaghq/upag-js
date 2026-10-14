@@ -8,6 +8,7 @@ export * from './types';
 export { Antifraud } from './resources/antifraud';
 export { Cards } from './resources/cards';
 export { Checkout } from './resources/checkout';
+export { Files } from './resources/files';
 export { ThreeDSecure } from './resources/three-d-secure';
 
 // Default export

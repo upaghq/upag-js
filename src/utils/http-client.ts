@@ -64,8 +64,8 @@ export class HttpClient {
     try {
       response = await globalThis.fetch(this.buildUrl(url), {
         method,
-        headers: this.buildHeaders(options),
-        body: data === undefined ? undefined : JSON.stringify(data),
+        headers: this.buildHeaders(options, this.isFormData(data)),
+        body: this.buildBody(data),
         signal: controller.signal,
       });
     } catch (error) {
@@ -87,8 +87,22 @@ export class HttpClient {
     }
   }
 
-  private buildHeaders(options?: RequestOptions): Record<string, string> {
+  private isFormData(data: unknown): data is FormData {
+    return typeof FormData !== 'undefined' && data instanceof FormData;
+  }
+
+  /** `FormData` goes as is (multipart); anything else is JSON. */
+  private buildBody(data: unknown): BodyInit | undefined {
+    if (data === undefined) return undefined;
+    return this.isFormData(data) ? data : JSON.stringify(data);
+  }
+
+  private buildHeaders(options?: RequestOptions, multipart = false): Record<string, string> {
     const headers = { ...this.headers, ...options?.headers };
+    // fetch sets `multipart/form-data` with its boundary; a fixed Content-Type would break it.
+    if (multipart) {
+      delete headers['Content-Type'];
+    }
     if (options?.auth === 'none') {
       delete headers.Authorization;
       return headers;
