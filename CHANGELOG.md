@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `pix.openModal({ qrCodeUrl?, copyPaste, amount?, expiresAt? })`: opens a pt-BR modal with the Pix QR code image and the copia e cola, with a copy button. It returns `{ close(), closed }`; `closed` resolves with `{ reason: 'dismissed' | 'closed' }`. It only displays the payment (no payment detection) and makes no API calls. Closes on X, backdrop and Esc; only one is open at a time. New types `OpenPixModalParams`, `PixModalHandle` and `PixModalResult`.
 - Boleto on shopper checkout. `checkout.confirm` accepts `charge: { method: 'boleto' }` (the customer needs a full address and phone; on a subscription a new boleto is issued every billing cycle and paid manually). The confirmed charge carries a `boleto` block (`barcode`, `digitableLine`, `pdfUrl`, `dueDate`, `lastPayableDate`) and stays `pending` until paid. `CheckoutPaymentMethodType` gains `'boleto'`.
 - Pix charges carry `pix.qrCodeUrl`, the public URL of the QR code as a PNG (`null` on older charges or when the image could not be generated), and `pix.copyPaste` (same value as the deprecated `pix.qrCode`) on `CheckoutCharge`. The shopper `pix` block gains `qrCodeUrl`. `pix.reference` and `pix.qrCode` stay, deprecated.
 - `checkout.startShopify({ items })` starts a session from a Shopify cart (`POST /checkout/shopify/sessions`) and returns `{ url }`.
@@ -64,6 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Card tokenization for secure card data handling
 - Browser-safe API design
 
-[Unreleased]: https://github.com/upag/upag-js/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/upag/upag-js/releases/tag/v1.0.0
+[Unreleased]: https://github.com/upaghq/upag-js/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/upaghq/upag-js/releases/tag/v1.0.0
 

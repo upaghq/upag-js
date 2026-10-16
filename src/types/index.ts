@@ -637,6 +637,30 @@ export interface ThreeDSecureResult {
   status: 'completed';
 }
 
+// Pix modal types
+export interface OpenPixModalParams {
+  /** Public URL of the QR code image (`pix.qrCodeUrl`). Without it, only the copia e cola is shown. */
+  qrCodeUrl?: string | null;
+  /** Pix BR Code (copia e cola, `pix.copyPaste`). */
+  copyPaste: string;
+  /** Amount to display, in integer cents. */
+  amount?: number;
+  /** ISO date when the Pix expires (`pix.expiresAt`). */
+  expiresAt?: string | null;
+}
+
+export interface PixModalResult {
+  /** `dismissed`: the buyer closed it (X, backdrop or Esc). `closed`: `close()` was called or another modal replaced it. */
+  reason: 'dismissed' | 'closed';
+}
+
+export interface PixModalHandle {
+  /** Closes the modal. Does nothing if it is already closed. */
+  close(): void;
+  /** Resolves when the modal closes. */
+  closed: Promise<PixModalResult>;
+}
+
 // Error types
 export interface UpagError {
   type: string;

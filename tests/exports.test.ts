@@ -31,6 +31,8 @@ describe('public surface', () => {
   it('keeps cards, threeDSecure, checkout and antifraud at the top level', () => {
     expect(upag.cards).toBeDefined();
     expect(upag.threeDSecure).toBeDefined();
+    expect(upag.pix.openModal).toBeTypeOf('function');
+    expect((sdk as Record<string, unknown>).Pix).toBeDefined();
     expect(upag.checkout).toBeDefined();
     expect(upag.antifraud).toBeDefined();
     expect(upag.files).toBeDefined();

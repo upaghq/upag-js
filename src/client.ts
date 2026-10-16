@@ -5,6 +5,7 @@ import { Antifraud } from './resources/antifraud';
 import { Cards } from './resources/cards';
 import { Checkout } from './resources/checkout';
 import { Files } from './resources/files';
+import { Pix } from './resources/pix';
 import { ThreeDSecure } from './resources/three-d-secure';
 
 export class UpagJs {
@@ -21,6 +22,7 @@ export class UpagJs {
   public readonly cards: Cards;
   public readonly checkout: Checkout;
   public readonly files: Files;
+  public readonly pix: Pix;
   public readonly threeDSecure: ThreeDSecure;
 
   /**
@@ -50,6 +52,7 @@ export class UpagJs {
     this.cards = new Cards(this.http);
     this.checkout = new Checkout(this.http);
     this.files = new Files(this.http);
+    this.pix = new Pix();
     this.threeDSecure = new ThreeDSecure(this.http);
   }
 }

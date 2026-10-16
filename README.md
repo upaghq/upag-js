@@ -108,6 +108,32 @@ await upag.checkout.redirectToCheckout('link-code');
 
 Creating sessions, products and prices is done from your server with a secret key.
 
+### Pix modal
+
+Shows the Pix QR code and the copia e cola in a modal, with a button to copy the code. Feed it the `pix` block of the confirmed charge.
+
+```javascript
+const paid = await upag.checkout.confirm(id, clientSecret, {
+  customer: { name: 'Jane Doe', document: { type: 'cpf', number: '52998224725' } },
+  charge: { method: 'pix' },
+});
+const { pix } = paid.charge;
+
+const modal = upag.pix.openModal({
+  qrCodeUrl: pix.qrCodeUrl,   // optional: public URL of the QR code PNG
+  copyPaste: pix.copyPaste,   // required: Pix BR Code
+  amount: paid.charge.amount, // optional: integer cents
+  expiresAt: pix.expiresAt,   // optional: ISO date
+});
+
+// The modal only shows the payment. Poll `checkout.retrieve` yourself and close it once paid.
+modal.close();
+
+const { reason } = await modal.closed; // 'dismissed' (X, backdrop, Esc) | 'closed' (close() or replaced)
+```
+
+Without `qrCodeUrl` (or if the image fails to load) only the copia e cola is shown. `qrCodeUrl` must be an `http(s)` URL or a `data:image/` URL. Only one Pix modal is open at a time: opening another closes the first. `openModal` must be called in the browser (not during SSR). The text is in Portuguese (pt-BR).
+
 ### Cards
 
 Tokenizes a card and returns a card id. Your server uses that id to create a charge. The card number and security code are never returned.
@@ -346,6 +372,7 @@ Errors returned by the API carry its `code` (for example `session_expired`, `una
 | `checkout` | `removeCoupon(sessionId, clientSecret)` | Remove the coupon |
 | `checkout` | `redirectToCheckout(code, tracking?)` | Start and send the browser to the hosted page |
 | `cards` | `create(params, options?)` | Tokenize a card |
+| `pix` | `openModal({ qrCodeUrl?, copyPaste, amount?, expiresAt? })` | Show the Pix QR code and copia e cola in a modal; returns `{ close(), closed }` |
 | `threeDSecure` | `authenticate({ clientSecret }, options?)` | Run 3D Secure authentication for a session created by your server |
 
 ## Security Best Practices
@@ -363,7 +390,7 @@ Errors returned by the API carry its `code` (for example `session_expired`, `una
 
 ## Public Keys
 
-Get your public keys from the [Upag Dashboard](https://dashboard.upag.io).
+Get your public keys from the [Upag Dashboard](https://app.upag.io).
 
 - **Test mode**: `pk_test_...` - Use for testing
 - **Live mode**: `pk_live_...` - Use in production
@@ -393,4 +420,4 @@ MIT
 
 - Documentation: https://docs.upag.io
 - Email: support@upag.io
-- GitHub: https://github.com/upag/upag-js
+- GitHub: https://github.com/upaghq/upag-js
