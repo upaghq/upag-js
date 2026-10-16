@@ -50,6 +50,26 @@ describe('Pix.openModal', () => {
     modal.close();
   });
 
+  it('shows the Upag logo and says the Pix is intermediated by Upag', () => {
+    pix.openModal({ copyPaste: COPY_PASTE });
+
+    const logo = q<HTMLImageElement>('.upag-pix-logo');
+    expect(logo.getAttribute('src')).toBe('https://cdn.upag.io/img/logo/black.png');
+    expect(logo.alt).toBe('Upag');
+    expect(q('.upag-pix-footer').textContent).toBe('Pagamento via Pix intermediado pela Upag');
+  });
+
+  it('keeps working when the logo fails to load', () => {
+    pix.openModal({ qrCodeUrl: QR_URL, copyPaste: COPY_PASTE });
+    const logo = q<HTMLImageElement>('.upag-pix-logo');
+
+    logo.dispatchEvent(new Event('error'));
+
+    expect(logo.style.display).toBe('none');
+    expect(q<HTMLImageElement>('.upag-pix-qr').style.display).not.toBe('none');
+    expect(q('.upag-pix-code').textContent).toBe(COPY_PASTE);
+  });
+
   it('shows only the copia e cola when there is no QR url', () => {
     pix.openModal({ qrCodeUrl: null, copyPaste: COPY_PASTE });
 

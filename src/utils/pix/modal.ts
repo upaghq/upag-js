@@ -7,6 +7,8 @@ const COPIED_LABEL = 'Copiado!';
 const COPY_FAILED_LABEL = 'Não foi possível copiar';
 const FEEDBACK_MS = 2000;
 const TITLE_ID = 'upag-pix-title';
+const LOGO_URL = 'https://cdn.upag.io/img/logo/black.png';
+const FOOTER_TEXT = 'Pagamento via Pix intermediado pela Upag';
 
 type CloseReason = PixModalResult['reason'];
 
@@ -80,10 +82,18 @@ export function openPixModal(params: OpenPixModalParams): PixModalHandle {
   closeButton.type = 'button';
   closeButton.setAttribute('aria-label', 'Fechar');
 
+  // Branding only: the modal works the same if the logo cannot load.
+  const logo = element('img', 'upag-pix-logo');
+  logo.alt = 'Upag';
+  logo.addEventListener('error', () => {
+    logo.style.display = 'none';
+  });
+  logo.src = LOGO_URL;
+
   const title = element('h2', 'upag-pix-title', 'Pague com Pix');
   title.id = TITLE_ID;
 
-  dialog.append(closeButton, title);
+  dialog.append(closeButton, logo, title);
 
   if (typeof params.amount === 'number' && Number.isFinite(params.amount)) {
     dialog.appendChild(element('p', 'upag-pix-amount', formatAmount(params.amount)));
@@ -109,6 +119,8 @@ export function openPixModal(params: OpenPixModalParams): PixModalHandle {
   const copyButton = element('button', 'upag-pix-copy', COPY_LABEL);
   copyButton.type = 'button';
   dialog.appendChild(copyButton);
+
+  dialog.appendChild(element('p', 'upag-pix-footer', FOOTER_TEXT));
 
   overlay.appendChild(dialog);
 

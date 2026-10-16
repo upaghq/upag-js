@@ -56,6 +56,23 @@ export const PIX_MODAL_CSS = `
   color: #111827;
 }
 
+.upag-pix-logo {
+  display: block;
+  height: 32px;
+  width: auto;
+  max-width: 140px;
+  margin: 0 auto 16px;
+  object-fit: contain;
+}
+
+.upag-pix-footer {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 .upag-pix-title {
   margin: 0 0 4px;
   font-size: 18px;

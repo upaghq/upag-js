@@ -132,7 +132,7 @@ modal.close();
 const { reason } = await modal.closed; // 'dismissed' (X, backdrop, Esc) | 'closed' (close() or replaced)
 ```
 
-Without `qrCodeUrl` (or if the image fails to load) only the copia e cola is shown. `qrCodeUrl` must be an `http(s)` URL or a `data:image/` URL. Only one Pix modal is open at a time: opening another closes the first. `openModal` must be called in the browser (not during SSR). The text is in Portuguese (pt-BR).
+Without `qrCodeUrl` (or if the image fails to load) only the copia e cola is shown. `qrCodeUrl` must be an `http(s)` URL or a `data:image/` URL. Only one Pix modal is open at a time: opening another closes the first. `openModal` must be called in the browser (not during SSR). The text is in Portuguese (pt-BR). The modal shows the Upag logo (loaded from `https://cdn.upag.io/img/logo/black.png`; if your site has a Content-Security-Policy, allow that host in `img-src`) and the footer "Pagamento via Pix intermediado pela Upag".
 
 ### Cards
 
