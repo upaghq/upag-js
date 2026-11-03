@@ -11,7 +11,8 @@ const SCRIPT_ID = 'upag-antifraud';
  * Device session for card risk. Starts when the client is constructed in a
  * browser. A `pk_test_` key uses the sandbox org; any other key uses production.
  *
- * Send `sessionId()` as `meta.session_id` on a card charge. Call `rotate()`
+ * Send `sessionId()` as `meta.session_id` on a card charge, or as
+ * `charge.deviceSession` on `checkout.confirm`. Call `rotate()`
  * before a retry: a reused id lowers approval rates.
  */
 export class Antifraud {
