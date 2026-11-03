@@ -513,6 +513,8 @@ export interface ConfirmCardPayment {
   card: string;
   installments?: number;
   threeDSecureSession?: string;
+  /** `antifraud.sessionId()`, unique per payment attempt. */
+  deviceSession?: string;
   ipAddress?: string;
   location?: {
     city?: string | null;
