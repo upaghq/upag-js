@@ -94,8 +94,6 @@ function createChallengeMessageHandler(
   const expectedOrigin = marlimApiOrigin(env);
   return (event: MessageEvent) => {
     try {
-      // TEMP: inspecting what the challenge return page posts on cancel; remove once known.
-      console.log('[upag 3ds] challenge message', event.origin, JSON.stringify(event.data));
       if (expectedOrigin && event.origin !== expectedOrigin) return;
       if (event.data.status === 'completed') {
         console.log('Challenge completed');
